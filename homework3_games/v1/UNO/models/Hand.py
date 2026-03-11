@@ -1,2 +1,19 @@
+from typing import List
+from models.Card import Card
+
 class Hand:
-    pass
+    def __init__(self):
+        self._cards: List[Card] = []
+
+    @property
+    def cards(self) -> List[Card]:
+        return self._cards
+
+    def add_card(self, card: Card) -> None:
+        self._cards.append(card)
+
+    def remove_card(self, card: Card) -> None:
+        if card in self._cards:
+            self._cards.remove(card)
+        else:
+            raise ValueError("Card not in hand.")
