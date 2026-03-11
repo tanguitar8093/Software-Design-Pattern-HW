@@ -1,24 +1,13 @@
-#抽象要 import 那些東西
-from abc import ABC, abstractmethod
+from models.Player.Player import Player
+from models.Decision.RandomDecision import RandomDecision
 
-class AIPlayer(ABC):
+class AIPlayer(Player):
     
-    def __init__(self):
-        self._points: int = 0
-        self._hand: Hand = Hand()
-        self._name: str = ""
+    def __init__(self, name: str):
+        super().__init__(decision=RandomDecision())
+        self._name = str(name)
 
+    def name_himself(self) -> None:
+        self._name = f"AIPlayer-{self._name}"
 
-    @abstractmethod
-    def name_himself(self):
-        pass
-
-    def show(self,decision: Decision):
-        decision.make_decision(hand: self._hand)
-
-    def add_point(self,point: int):
-        self._points += point
-    
-    def add_hand(self,card: Card):
-        pass
         
