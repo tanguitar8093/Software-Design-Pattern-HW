@@ -1,0 +1,169 @@
+classDiagram
+    namespace common {
+        class Game {
+            <<abstract>>
+            #_players: list
+            #_deck
+            +start() void
+            +_game_name() str
+            #_create_deck()*
+            #_deal_cards()*
+            #_is_game_over()* bool
+            #_take_a_turn()*
+            #_show_cards()*
+            #_diff_cards()*
+            #_print_victor()*
+        }
+        class AbstractDecision {
+            <<abstract>>
+            +make_decision(hand, context=None)*
+        }
+        class AbstractPlayer {
+            <<abstract>>
+            #_name: str
+            #_point: int
+            #_hand
+            #_decision: AbstractDecision
+            +name: str
+            +point: int
+            +name_himself()*
+            +show(context=None)
+            +add_point(point)
+            +add_hand(card)
+            +has_empty_hand() bool
+        }
+    }
+
+    namespace Showdown {
+        class ShowdownGame {
+            -_turn_cards: dict
+            -_turns_played: int
+            +_create_deck()
+            +_game_name() str
+            +_deal_cards()
+            +_is_game_over() bool
+            +_take_a_turn()
+            +_show_cards()
+            +_diff_cards()
+            +_print_victor()
+        }
+        class ShowdownDecision {
+            <<abstract>>
+            +make_decision(hand, context=None)*
+        }
+        class ShowdownCLIDecision {
+            +make_decision(hand, context=None)
+        }
+        class ShowdownRandomDecision {
+            +make_decision(hand, context=None)
+        }
+        class ShowdownPlayer {
+            <<abstract>>
+            +name_himself()*
+        }
+        class ShowdownHumanPlayer {
+            +name_himself()
+        }
+        class ShowdownAIPlayer {
+            +name_himself()
+        }
+        class ShowdownDeck {
+            -_cards: List~Card~
+            +shuffle()
+            +draw_card() Card
+        }
+        class ShowdownCard {
+            -_rank: Rank
+            -_suit: Suit
+            +rank: Rank
+            +suit: Suit
+            +__gt__(other) bool
+        }
+        class ShowdownHand {
+            -_cards: List~Card~
+            +add_card(card)
+            +remove_card(card)
+        }
+    }
+
+    namespace UNO {
+        class UNOGame {
+            -_discard_pile: List
+            -_top_card: Card
+            -_winner: Player
+            +_create_deck()
+            +_game_name() str
+            +_deal_cards()
+            +_is_game_over() bool
+            +_take_a_turn()
+            +_show_cards()
+            +_diff_cards()
+            +_print_victor()
+        }
+        class UNODecision {
+            <<abstract>>
+            +make_decision(hand, context=None)*
+        }
+        class UNOCLIDecision {
+            +make_decision(hand, context=None)
+        }
+        class UNORandomDecision {
+            +make_decision(hand, context=None)
+        }
+        class UNOPlayer {
+            <<abstract>>
+            +name_himself()*
+            +has_valid_card(top_card) bool
+        }
+        class UNOHumanPlayer {
+            +name_himself()
+        }
+        class UNOAIPlayer {
+            +name_himself()
+        }
+        class UNODeck {
+            -_cards: List~Card~
+            +shuffle()
+            +draw_card() Card
+            +is_empty() bool
+            +add_discarded_cards(cards)
+        }
+        class UNOCard {
+            -_color: Color
+            -_number: Number
+            +color: Color
+            +number: Number
+            +is_match(other) bool
+        }
+        class UNOHand {
+            -_cards: List~Card~
+            +add_card(card)
+            +remove_card(card)
+        }
+    }
+
+    Game <|-- ShowdownGame
+    Game <|-- UNOGame
+    AbstractDecision <|-- ShowdownDecision
+    AbstractDecision <|-- UNODecision
+    AbstractPlayer <|-- ShowdownPlayer
+    AbstractPlayer <|-- UNOPlayer
+    ShowdownDecision <|-- ShowdownCLIDecision
+    ShowdownDecision <|-- ShowdownRandomDecision
+    UNODecision <|-- UNOCLIDecision
+    UNODecision <|-- UNORandomDecision
+    ShowdownPlayer <|-- ShowdownHumanPlayer
+    ShowdownPlayer <|-- ShowdownAIPlayer
+    UNOPlayer <|-- UNOHumanPlayer
+    UNOPlayer <|-- UNOAIPlayer
+    AbstractPlayer o-- AbstractDecision
+    ShowdownGame o-- ShowdownDeck
+    ShowdownGame o-- ShowdownPlayer
+    UNOGame o-- UNODeck
+    UNOGame o-- UNOPlayer
+    ShowdownPlayer o-- ShowdownHand
+    UNOPlayer o-- UNOHand
+    ShowdownHumanPlayer ..> ShowdownCLIDecision : uses
+    ShowdownAIPlayer ..> ShowdownRandomDecision : uses
+    UNOHumanPlayer ..> UNOCLIDecision : uses
+    UNOAIPlayer ..> UNORandomDecision : uses
