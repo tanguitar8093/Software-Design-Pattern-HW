@@ -1,0 +1,2 @@
+class CommandLineDecision:
+    pass
