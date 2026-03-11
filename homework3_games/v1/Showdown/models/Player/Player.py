@@ -37,5 +37,5 @@ class Player(ABC):
     
     def add_hand(self, card: Card) -> None:
         """Adds a card to the player's Hand object."""
-        self._hand.add_hand(card)
+        self._hand.add_card(card)
         

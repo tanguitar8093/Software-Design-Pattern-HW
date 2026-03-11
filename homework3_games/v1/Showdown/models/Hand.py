@@ -9,7 +9,7 @@ class Hand:
     def cards(self) -> List[Card]:
         return self._cards
 
-    def add_hand(self, card: Card) -> None:
+    def add_card(self, card: Card) -> None:
         """
         Add a card to the hand.
         The UML constraints the hand to have a max of 13 cards.
