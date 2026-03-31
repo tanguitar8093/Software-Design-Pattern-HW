@@ -58,7 +58,6 @@ class Big2Game:
             card = self._deck.deal()
             # 用求餘數的方式將牌依序分給四位玩家 (0, 1, 2, 3, 0, 1...)
             self.players[i % 4].hand_cards.append(card)
-
     def _play_round(self) -> None:
         """內部邏輯：處理每一輪的出牌"""
         pass

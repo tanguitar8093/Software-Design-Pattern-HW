@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 class RoundStrategy(ABC):
 
     def play_round(self):
+        # Template Method: 定義了回合執行的骨架
         pass
 
     def do_common_rule_rounds(self, rounds: int) -> int:
@@ -18,6 +19,7 @@ class RoundStrategy(ABC):
 
 class FirstRoundStrategy(RoundStrategy):
     def do_before_common_rule(self, rounds: int) -> None:
+        # 第一回合特有邏輯：由持有梅花3的玩家先出牌，且該次出牌必須包含梅花3
         pass
 
     def do_after_common_rule(self, rounds: int) -> None:
@@ -28,4 +30,5 @@ class ContinueRoundStrategy(RoundStrategy):
         pass
 
     def do_after_common_rule(self, rounds: int) -> None:
+        # 續局特有邏輯：如果在上一回合結束時有玩家勝出，或者清空檯面重新由頂牌玩家開始
         pass
