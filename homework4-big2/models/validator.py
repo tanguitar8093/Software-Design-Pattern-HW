@@ -1,39 +1,36 @@
-from typing import Type, Callable, Optional, Any
+from typing import Type, Callable, Optional, Any, TypeVar, overload, Union
+
+T = TypeVar('T')
 
 class Validator:
-    """
-    [高端技巧] 描述符 (Descriptor) 模式
-    用來取代傳統落落長的 @property / @setter，能將所有的變數驗證邏輯封裝並重用，
-    既保有 obj.attr = value 的優雅賦值寫法，又做到嚴格的 setter 攔截與防呆。
-    """
-    def __init__(self, expected_type: Type, allow_none: bool = False, rule: Optional[Callable] = None):
+    def __init__(self, expected_type: Type[T], allow_none: bool = False, rule: Optional[Callable[[T], bool]] = None):
         self.expected_type = expected_type
         self.allow_none = allow_none
         self.rule = rule
 
     def __set_name__(self, owner, name):
-        # 自動建立對應的私有變數名稱，例如定義 players 屬性，背後就會存進 _players
-        self.private_name = f"_{name}"
+        # 修正：避免與 Big2Game 定義的 _players 衝突，建議改名或統一
+        self.private_name = f"_val_{name}" 
+
+    @overload
+    def __get__(self, obj: None, objtype: Any) -> 'Validator': ...
+    
+    @overload
+    def __get__(self, obj: Any, objtype: Any) -> T: ...
 
     def __get__(self, obj, objtype=None):
         if obj is None: return self
-        # 拿取時依然是去拿背後的 _private 變數
-        return getattr(obj, self.private_name, None)
+        value = getattr(obj, self.private_name, None)
+        # 如果不允許 None 但拿到 None，這通常是初始化順序問題，但在 runtime 應報錯
+        return value
 
     def __set__(self, obj, value):
-        # 1. 基礎驗證：檢查 Null
         if value is None:
             if not self.allow_none:
-                raise ValueError(f"{self.private_name} 不能被設定為 None")
+                raise ValueError(f"屬性不能為 None")
         else:
-            # 2. 型別驗證：擋掉不合法的型別
             if not isinstance(value, self.expected_type):
-                raise TypeError(f"設定錯誤: 期待 {self.expected_type.__name__} 型別，但收到了 {type(value).__name__}")
-            
-            # 3. 商業邏輯驗證：檢查自訂規則
-            if self.rule:
-                if not self.rule(value):
-                    raise ValueError(f"{self.private_name} 設定的數值未通過規則驗證")
-        
-        # 通過所有驗證後，才真正寫入底層私有屬性
+                raise TypeError(f"期待 {self.expected_type.__name__}")
+            if self.rule and not self.rule(value):
+                raise ValueError(f"未通過規則驗證")
         setattr(obj, self.private_name, value)
