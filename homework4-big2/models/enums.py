@@ -7,9 +7,6 @@ class Suit(Enum):
     HEARTS = "H"
     SPADES = "S"
 
-    def __lt__(self, other):
-        pass
-
 class Rank(Enum):
     THREE = "3"
     FOUR = "4"
@@ -18,12 +15,10 @@ class Rank(Enum):
     SEVEN = "7"
     EIGHT = "8"
     NINE = "9"
-    TEN = "T"
+    TEN = "10"
     JACK = "J"
     QUEEN = "Q"
     KING = "K"
     ACE = "A"
     TWO = "2"
 
-    def __lt__(self, other):
-        pass

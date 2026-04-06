@@ -1,62 +1,91 @@
-from typing import List, Optional
-from .strategy import RoundStrategy, FirstRoundStrategy, ContinueRoundStrategy
-from .validator import Validator
+from .round_strategy.round_strategy import RoundStrategy
+from .round_strategy.first_round_strategy import FirstRoundStrategy
+from .round_strategy.continue_round_strategy import ContinueRoundStrategy
 from .deck import Deck
-from .player import Player
+from .player.player import Player
 from .pattern import CardPattern
 class Big2Game:
-
-    _players = Validator(list, rule=lambda p: len(p) == 4)
     
-    def __init__(self, players: List[Player]):
-        # 觸發 Validator
-        self._players = players
-        self._rounds = 1
-        self._is_game_over = False
-        self._deck = Deck()
-        self._top_play = None  # Add top_play attribute
+    def __init__(self, players: list[Player]):
+        self._players: list[Player] = players
+        self._rounds: int = 1
+        self._is_game_over: bool = False
+        self._deck: Deck = Deck()
+        self._top_play: CardPattern | None = None  
+        self._top_player: Player | None = None
 
+    @property
+    def players(self) -> list[Player]:
+        return self._players[:] 
+    
     @property
     def rounds(self) -> int:
         return self._rounds
 
     @property
-    def top_play(self) -> Optional[CardPattern]:
-        return self._top_play
+    def is_game_over(self) -> bool:
+        return self._is_game_over
 
+    @property
+    def deck(self) -> Deck:
+        return self._deck
+
+    @property
+    def top_play(self) -> CardPattern | None:
+        return self._top_play
+    
     @top_play.setter
-    def top_play(self, value: Optional[CardPattern]) -> None:
+    def top_play(self, value: CardPattern | None) -> None:
+        if value is not None and not isinstance(value, CardPattern):
+            raise ValueError("top_play 必須是 CardPattern 類型或 None")
         self._top_play = value
 
     @property
-    def players(self) -> List[Player]:
-        # 這裡回傳副本是正確的（保護性拷貝）
-        return self._players[:] 
+    def top_player(self) -> Player | None:
+        return self._top_player
 
-    def set_players_order(self, new_order: List[Player]) -> None:
-        self._players = new_order
+    @top_player.setter
+    def top_player(self, player: Player | None) -> None:
+        if player is not None and player not in self._players:
+            raise ValueError("top_player 必須是玩家列表中的一員或 None")
+        self._top_player = player
+    
+    def set_players_order(self, players: list[Player]) -> None:
+        if set(players) != set(self._players):
+            raise ValueError("傳入的玩家列表與現有玩家不相同")
+        self._players = players[:]
+    
+    def validate_end_game(self,player: Player) -> bool:
+        if not player.hand_cards:
+            print(f"遊戲結束！")
+            self._is_game_over = True
+            return True
+        return False
+
+    def print_winner(self) -> None:
+        winner = self.top_player
+        if winner is None:
+            raise ValueError("無法印出勝利者，因為 top_player 為 None")
+        print(f"恭喜玩家 {winner.name} 獲勝！")
+
 
     def start(self) -> None:
-        # 初始化名字
-        for i, player in enumerate(self._players): # 直接用底層資料
+        # 玩家命名
+        for i, player in enumerate(self._players):
             player.name_himself(i)
-            
+        # 洗牌
         self._deck.shuffle()
-
-        # 發牌：必須直接操作 self._players_val 確保資料有寫進去
+        for player in self._players:
+            print(player.name)
+        # 發牌
         total_cards = len(self._deck)
         for i in range(total_cards):
             card = self._deck.deal()
-            # 修正：不要經由 property，直接經由底層 list
-            self._players[i % 4].hand_cards.append(card)
-        
+            self._players[i % 4].add_card(card)
+        # 進行遊戲
         while not self._is_game_over:
-            # 根據回合選擇策略
             strategy: RoundStrategy = FirstRoundStrategy() if self._rounds == 1 else ContinueRoundStrategy()
-            
-            # 執行策略 (Dependency Injection)
             strategy.play_round(self)
-            # 檢查結束邏輯 (假設簡化)
-            if any(len(p.hand_cards) == 0 for p in self._players):
-                self._is_game_over = True
             self._rounds += 1
+        # 印出勝利者
+        self.print_winner()

@@ -1,4 +1,5 @@
-from models.player import HumanPlayer, AIPlayer
+from models.player.human_player import HumanPlayer
+from models.player.ai_player import AIPlayer
 from models.game import Big2Game
 
 def main():
@@ -19,10 +20,10 @@ def main():
     players = []
 
     for _ in range(num_humans):
-        players.append(HumanPlayer(""))
+        players.append(HumanPlayer(id=len(players)))
     
     for _ in range(num_ai):
-        players.append(AIPlayer(""))
+        players.append(AIPlayer(id=len(players)))
     
     # 建立遊戲實體，將 4 位玩家傳入
     game = Big2Game(players)
@@ -31,10 +32,21 @@ def main():
     print("正在準備遊戲...")
     game.start()
 
-    print("\n--- 遊戲初始化已完成 ---")
-    print("以下是本局遊戲的玩家陣容：")
-    for player in game.players:
-        print(f"- 玩家名稱: {player.name}, 手牌數量: {len(player.hand_cards)} 張")
-
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--test" in sys.argv:
+        try:
+            filename_idx = sys.argv.index("--test") + 1
+            filename = sys.argv[filename_idx]
+        except IndexError:
+            print("請提供測試檔名")
+            sys.exit(1)
+        
+        from test_manager import TestManager
+        manager = TestManager(filename).run()
+        try:
+            main()
+        finally:
+            manager.cleanup()
+    else:
+        main()
