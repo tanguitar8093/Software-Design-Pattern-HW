@@ -3,7 +3,7 @@ from .round_strategy.first_round_strategy import FirstRoundStrategy
 from .round_strategy.continue_round_strategy import ContinueRoundStrategy
 from .deck import Deck
 from .player.player import Player
-
+from .round_strategy.round_result import RoundResult
 class Big2Game:
     def __init__(self, players: list[Player]):
         self._players: list[Player] = players
@@ -37,7 +37,7 @@ class Big2Game:
             strategy: RoundStrategy = FirstRoundStrategy() if self._rounds == 1 else ContinueRoundStrategy()
             
             # Data In: 玩家清單, 回合數, 上一把贏家
-            result = strategy.play_round(self._players, self._rounds, self._top_player)
+            result: RoundResult = strategy.play_round(self._players, self._rounds, self._top_player)
             
             # Data Out: 將策略回傳的結果更新至 Game 的狀態
             self._top_player = result.top_player
