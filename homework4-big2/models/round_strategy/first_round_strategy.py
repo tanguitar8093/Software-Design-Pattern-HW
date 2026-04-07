@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING
 from models.enums import Suit, Rank
 from models.card import Card
 from models.round_strategy.round_strategy import RoundBaseStrategy
-from models.round_strategy.game_context import GameContext
+
 if TYPE_CHECKING:
+    from models.player.player import Player
     from models.pattern import CardPattern
 
 class FirstRoundStrategy(RoundBaseStrategy):
@@ -14,13 +15,11 @@ class FirstRoundStrategy(RoundBaseStrategy):
         return any(c.suit == Suit.CLUBS and c.rank == Rank.THREE for c in cards)
 
     # (異) 找出 current_player (第一回合梅花三負責起手)
-    def prepare_starting_player(self, game: GameContext) -> None:
-        players = game.players
+    def prepare_starting_player(self, players: list[Player], last_winner: Player | None) -> list[Player]:
         for player in players:
             if self._validate_having_clubs_3(player.hand_cards):
                 print(f"玩家 {player.name} 擁有梅花 3，將先開始出牌！")
-                game.set_players_order(players[players.index(player):] + players[:players.index(player)])
-                return
+                return players[players.index(player):] + players[:players.index(player)]
         raise ValueError("沒有玩家擁有梅花 3")
 
     # (異) 驗證時要判斷第一回合首發是梅花三

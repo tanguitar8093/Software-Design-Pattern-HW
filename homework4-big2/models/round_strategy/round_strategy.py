@@ -3,15 +3,15 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 from models.card import Card
 from models.handler import SingleHandler, PairHandler, StraightHandler, FullHouseHandler
-from models.round_strategy.game_context import GameContext
+from models.round_strategy.round_result import RoundResult
 
 if TYPE_CHECKING:
     from models.pattern import CardPattern
-    from models.player import Player
+    from models.player.player import Player
 
 class RoundStrategy(ABC):
     @abstractmethod
-    def play_round(self, game: GameContext) -> None:
+    def play_round(self, players: list[Player], rounds: int, last_winner: Player | None) -> RoundResult:
         pass
 
 class RoundBaseStrategy(RoundStrategy):
@@ -30,30 +30,31 @@ class RoundBaseStrategy(RoundStrategy):
         self._pass_count = value
 
     # ===== 樣板方法核心 =====
-    def play_round(self, game: GameContext) -> None:
+    def play_round(self, players: list[Player], rounds: int, last_winner: Player | None) -> RoundResult:
         # 1. 找出 current_player，設定這回合的出牌順序 => (異)
-        self.prepare_starting_player(game)
+        ordered_players = self.prepare_starting_player(players, last_winner)
 
         # 回合初始設定 (同)
-        game.top_play = None
+        top_play: CardPattern | None = None
+        top_player: Player | None = None
         self._pass_count = 0
         current_idx = 0 
         
-        print(f"第 {game.rounds} 回合開始！")
+        print(f"第 {rounds} 回合開始！")
         
         # 累積連續三個 pass 此回合結束 => (同)
         while self._pass_count < 3:
-            current_player = game.players[current_idx]
+            current_player = ordered_players[current_idx]
             print(f"輪到玩家：{current_player.name}")
-            top_play_str = " ".join(str(c) for c in game.top_play.cards) if game.top_play else "無"
+            top_play_str = " ".join(str(c) for c in top_play.cards) if top_play else "無"
             print(f"目前牌面：{top_play_str}")
             
             # 2. current_player 出牌
-            cards = current_player.play(game.top_play)
+            cards = current_player.play(top_play)
             
             # 3. 驗證 (統整「先發禁Pass」、「頂牌大小」、「首回合梅花三」規則) => (同+異)
             # 如果驗證沒過，直接 continue 讓同一個玩家重新出牌
-            is_valid, card_pattern = self.validate_action(current_player, cards, game.top_play)
+            is_valid, card_pattern = self.validate_action(current_player, cards, top_play)
             if not is_valid:
                 continue
 
@@ -65,19 +66,24 @@ class RoundBaseStrategy(RoundStrategy):
             else:
                 # 這是合法的出牌
                 print(f"玩家 {current_player.name} 出牌成功：{card_pattern.get_pattern_name()} {' '.join(str(c) for c in cards)}")
-                game.top_play = card_pattern # 出牌成功設為頂牌
-                game.top_player = current_player
+                top_play = card_pattern # 出牌成功設為頂牌
+                top_player = current_player
                 # 扣除手牌
                 for card in cards:
                     current_player.remove_card(card)
                 self._pass_count = 0  # 有人出牌，重新計數 pass
                 
                 # 5. 判斷遊戲是否結束
-                if game.validate_end_game(current_player):
-                    break
+                if not current_player.hand_cards:
+                    print(f"遊戲結束！")
+                    return RoundResult(top_player=top_player, is_game_over=True)
             
             # 換下一位玩家
-            current_idx = (current_idx + 1) % len(game.players)
+            current_idx = (current_idx + 1) % len(ordered_players)
+            
+        if top_player is None:
+            raise ValueError("回合結束時沒有任何人出過牌")
+        return RoundResult(top_player=top_player, is_game_over=False)
 
 
     # ---------- 以下為驗證與共用細節 ----------
@@ -113,8 +119,8 @@ class RoundBaseStrategy(RoundStrategy):
         return True, card_pattern
 
     @abstractmethod
-    def prepare_starting_player(self, game: GameContext) -> None:
-        """(異) 準備這回合第一位發牌的玩家，並設定好順序"""
+    def prepare_starting_player(self, players: list[Player], last_winner: Player | None) -> list[Player]:
+        """(異) 準備這回合第一位發牌的玩家，並設定好順序回傳"""
         pass
 
     def validate_special_rule(self, card_pattern: CardPattern, top_play: CardPattern | None) -> bool:
