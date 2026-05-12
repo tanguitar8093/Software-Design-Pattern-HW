@@ -22,3 +22,6 @@ class State:
             self.duration -= 1
         if self.duration == 0:
             self.set_state("normal", 0)
+# forces: 需重構為狀態模式
+# 1. 若需擴充狀態, 就必須改核心檔案, 違反 OCP
+# 2. 狀態不同會造成不同的行為

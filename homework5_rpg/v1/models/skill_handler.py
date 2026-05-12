@@ -59,3 +59,7 @@ class SkillHandler:
         elif action_name == "Curse":
             pass
         return True
+
+#  forces: 需重構為策略模式
+# 1. 若需擴充技能, 就必須改核心檔案, 違反 OCP
+# 2. 需在操作中更換行為: 每回合可選擇不同技能, 技能不同會造成不同的行為
