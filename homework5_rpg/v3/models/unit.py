@@ -1,5 +1,8 @@
 from __future__ import annotations
-from typing import List
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models.actions.action import Action
 
 class Unit:
     def __init__(self, name: str, hp: int, mp: int, str_: int, is_hero: bool = False):
@@ -10,12 +13,13 @@ class Unit:
         self.is_hero = is_hero
         
         from models.states.normal_state import NormalState
+        from models.strategies.decision_strategy import DecisionStrategy
         self.current_state = NormalState()
-        self.strategy = None
-        self.skills = []
+        self.strategy: DecisionStrategy | None = None
+        self.skills: List[Action] = []
         self.observers = []
-        self.troop = None
-        self.enemy_troop = None
+        self.troop: List[Unit] = []
+        self.enemy_troop: List[Unit] = []
 
     def attack(self, target: Unit):
         self.cause_damage(target, self.str)
@@ -25,7 +29,7 @@ class Unit:
         bonus = 0
         if isinstance(self.current_state, CheeredUpState):
             bonus = 50
-        print(f"{self.name} causes {amount + bonus} damage to {target.name}.")
+        print(f"[{self.troop_id}]{self.name} 對 [{target.troop_id}]{target.name} 造成 {amount + bonus} 點傷害。")
         target.take_damage(amount + bonus)
 
     def take_damage(self, amt: int):
@@ -33,7 +37,7 @@ class Unit:
         self.hp -= amt
         if self.hp <= 0:
             self.hp = 0
-            print(f"{self.name} died.")
+            print(f"[{self.troop_id}]{self.name} 死亡。")
             self.notify()
 
     def heal(self, amt: int):

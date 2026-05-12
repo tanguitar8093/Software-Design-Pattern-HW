@@ -18,12 +18,12 @@ from battle_engine import BattleEngine
 def main():
     while True:
         try:
-            troop_size = int(input("Enter troop size: "))
+            val = input()
+            troop_size = int(val)
             if troop_size >= 1:
                 break
-            print("Size must be at least 1.")
-        except ValueError:
-            print("Invalid input.")
+        except Exception:
+            pass
 
     hero = Unit("Hero", 500, 500, 100, is_hero=True)
     hero.strategy = HumanStrategy()

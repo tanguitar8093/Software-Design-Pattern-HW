@@ -7,9 +7,11 @@ class BattleEngine:
         for u in self.troop1:
             u.troop = self.troop1
             u.enemy_troop = self.troop2
+            u.troop_id = 1
         for u in self.troop2:
             u.troop = self.troop2
             u.enemy_troop = self.troop1
+            u.troop_id = 2
 
     def is_game_over(self):
         t1_alive = any(u.hp > 0 for u in self.troop1)
@@ -19,8 +21,6 @@ class BattleEngine:
     def run_battle(self):
         round_num = 1
         while not self.is_game_over():
-            print(f"--- Round {round_num} ---")
-            
             all_units = []
             all_units.extend(self.troop1)
             all_units.extend(self.troop2)
@@ -29,7 +29,7 @@ class BattleEngine:
                 if unit.hp <= 0 or self.is_game_over():
                     continue
                     
-                print(f"[{unit.name}] HP:{unit.hp} MP:{unit.mp} State:{unit.current_state.name}")
+                print(f"輪到 [{unit.troop_id}]{unit.name} (HP: {unit.hp}, MP: {unit.mp}, STR: {unit.str}, State: {unit.current_state.name})。")
                     
                 unit.current_state.countdown(unit)
                 
@@ -56,8 +56,7 @@ class BattleEngine:
                 break
             round_num += 1
             
-        print("\n=== Game Over ===")
         if any(u.hp > 0 for u in self.troop1):
-            print("You win.")
+            print("你獲勝了！")
         else:
-            print("You lose.")
+            print("你失敗了！")

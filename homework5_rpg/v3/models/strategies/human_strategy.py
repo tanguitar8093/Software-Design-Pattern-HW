@@ -1,7 +1,10 @@
 from __future__ import annotations
 from models.unit import Unit
-from typing import List
+from typing import List, TYPE_CHECKING
 from models.strategies.decision_strategy import DecisionStrategy
+
+if TYPE_CHECKING:
+    from models.actions.action import Action
 
 class HumanStrategy(DecisionStrategy):
     def select_action(self, actor: Unit) -> Action:

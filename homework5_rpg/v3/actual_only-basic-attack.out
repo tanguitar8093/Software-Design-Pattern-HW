@@ -1,0 +1,67 @@
+輪到 [1]Hero (HP: 500, MP: 500, STR: 100, State: 正常)。
+Select an action for Hero:
+(0) 普通攻擊 (MP: 0)
+(1) 水球 (MP: 50)
+(2) 火球 (MP: 50)
+(3) 自我治療 (MP: 50)
+(4) 石化 (MP: 100)
+(5) 下毒 (MP: 80)
+(6) 召喚 (MP: 150)
+(7) 自爆 (MP: 200)
+(8) 鼓舞 (MP: 100)
+(9) 詛咒 (MP: 100)
+(10) 一拳攻擊 (MP: 180)
+> Select 1 target(s) for 普通攻擊:
+(0) Enemy_1 (HP: 300, State: 正常)
+Target 1/1 > Hero uses BasicAttack on ['Enemy_1']
+[1]Hero 對 [2]Enemy_1 造成 100 點傷害。
+輪到 [2]Enemy_1 (HP: 200, MP: 200, STR: 50, State: 正常)。
+Enemy_1 uses BasicAttack on ['Hero']
+[2]Enemy_1 對 [1]Hero 造成 50 點傷害。
+輪到 [1]Hero (HP: 450, MP: 500, STR: 100, State: 正常)。
+Select an action for Hero:
+(0) 普通攻擊 (MP: 0)
+(1) 水球 (MP: 50)
+(2) 火球 (MP: 50)
+(3) 自我治療 (MP: 50)
+(4) 石化 (MP: 100)
+(5) 下毒 (MP: 80)
+(6) 召喚 (MP: 150)
+(7) 自爆 (MP: 200)
+(8) 鼓舞 (MP: 100)
+(9) 詛咒 (MP: 100)
+(10) 一拳攻擊 (MP: 180)
+> Select 1 target(s) for 普通攻擊:
+(0) Enemy_1 (HP: 200, State: 正常)
+Target 1/1 > Hero uses BasicAttack on ['Enemy_1']
+[1]Hero 對 [2]Enemy_1 造成 100 點傷害。
+輪到 [2]Enemy_1 (HP: 100, MP: 200, STR: 50, State: 正常)。
+Enemy_1 uses BasicAttack on ['Hero']
+[2]Enemy_1 對 [1]Hero 造成 50 點傷害。
+輪到 [1]Hero (HP: 400, MP: 500, STR: 100, State: 正常)。
+Select an action for Hero:
+(0) 普通攻擊 (MP: 0)
+(1) 水球 (MP: 50)
+(2) 火球 (MP: 50)
+(3) 自我治療 (MP: 50)
+(4) 石化 (MP: 100)
+(5) 下毒 (MP: 80)
+(6) 召喚 (MP: 150)
+(7) 自爆 (MP: 200)
+(8) 鼓舞 (MP: 100)
+(9) 詛咒 (MP: 100)
+(10) 一拳攻擊 (MP: 180)
+> Select 1 target(s) for 普通攻擊:
+(0) Enemy_1 (HP: 100, State: 正常)
+Target 1/1 > Traceback (most recent call last):
+  File "/home/tanguitar/workspaces/dp-homework/homework5_rpg/v3/main.py", line 57, in <module>
+    main()
+  File "/home/tanguitar/workspaces/dp-homework/homework5_rpg/v3/main.py", line 54, in main
+    engine.run_battle()
+  File "/home/tanguitar/workspaces/dp-homework/homework5_rpg/v3/battle_engine.py", line 49, in run_battle
+    targets = unit.strategy.select_targets(unit, action, current_board)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tanguitar/workspaces/dp-homework/homework5_rpg/v3/models/strategies/human_strategy.py", line 52, in select_targets
+    choice = int(input(f"Target {len(targets) + 1}/{count} > "))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+EOFError: EOF when reading a line

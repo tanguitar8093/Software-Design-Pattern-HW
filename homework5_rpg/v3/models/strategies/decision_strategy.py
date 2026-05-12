@@ -1,7 +1,10 @@
 from __future__ import annotations
 from models.unit import Unit
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models.actions.action import Action
 
 class DecisionStrategy(ABC):
     @abstractmethod
