@@ -7,6 +7,8 @@ class PetrochemicalSkill(Action):
     def __init__(self):
         super().__init__("石化", 100, 1, "enemy")
     def execute(self, actor: Unit, targets: List[Unit]):
-        print(f"{actor.name} uses Petrochemical on {[t.name for t in targets]}")
+        target_names = ", ".join([f"[{t.troop_id}]{t.name}" for t in targets])
+        print(f"[{actor.troop_id}]{actor.name} 對 {target_names} 使用了 石化。")
+        
         for target in targets:
             target.change_state(PetrochemicalState())

@@ -21,28 +21,33 @@ class BattleEngine:
     def run_battle(self):
         round_num = 1
         while not self.is_game_over():
-            all_units = []
-            all_units.extend(self.troop1)
-            all_units.extend(self.troop2)
-
-            for unit in all_units:
+            idx = 0
+            while True:
+                all_units = []
+                all_units.extend(self.troop1)
+                all_units.extend(self.troop2)
+                if idx >= len(all_units):
+                    break
+                unit = all_units[idx]
+                idx += 1
                 if unit.hp <= 0 or self.is_game_over():
                     continue
                     
                 print(f"輪到 [{unit.troop_id}]{unit.name} (HP: {unit.hp}, MP: {unit.mp}, STR: {unit.str}, State: {unit.current_state.name})。")
                     
-                unit.current_state.countdown(unit)
                 
                 can_act = unit.current_state.on_round_begin(unit)
                 if unit.hp <= 0:
                     continue
                 if not can_act:
+                    unit.current_state.countdown(unit)
                     continue
                     
                 success = False
                 while not success:
                     action = unit.strategy.select_action(unit)
                     if unit.mp < action.mp_cost:
+                        print("你缺乏 MP，不能進行此行動。")
                         continue
                         
                     current_board = [u for u in self.troop1 + self.troop2 if u.hp > 0]
@@ -51,6 +56,7 @@ class BattleEngine:
                     unit.mp -= action.mp_cost
                     success = True
                     action.execute(unit, targets)
+                    unit.current_state.countdown(unit)
                     
             if self.is_game_over():
                 break

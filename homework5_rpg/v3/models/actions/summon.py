@@ -7,10 +7,12 @@ class Summon(Action):
     def __init__(self):
         super().__init__("召喚", 150, 0, "none")
     def execute(self, actor: Unit, targets: List[Unit]):
-        print(f"{actor.name} summoned a Slime!")
+        print(f"[{actor.troop_id}]{actor.name} 使用了 召喚。")
+        
         slime = Unit("Slime", 100, 0, 50, actor.is_hero)
         slime.troop = actor.troop
         slime.enemy_troop = actor.enemy_troop
+        slime.troop_id = actor.troop_id
         slime.attach(SummonerTrait(actor))
         # Add a BasicAttack to slime
         from models.actions.basic_attack import BasicAttack

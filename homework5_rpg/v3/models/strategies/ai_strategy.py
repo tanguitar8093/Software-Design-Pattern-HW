@@ -11,6 +11,10 @@ class AIStrategy(DecisionStrategy):
         self.seed = 0
 
     def select_action(self, actor: Unit) -> Action:
+        options = []
+        for i, skill in enumerate(actor.skills):
+            options.append(f"({i}) {skill.name}")
+        print(f"選擇行動：{' '.join(options)}")
         choice = actor.skills[self.seed % len(actor.skills)]
         self.seed += 1
         return choice
@@ -22,14 +26,17 @@ class AIStrategy(DecisionStrategy):
         elif action.target_type == "ally_not_self":
             candidates = [u for u in all_units if u.is_hero == actor.is_hero and u != actor and u.hp > 0]
             
-        if action.target_type in ["none", "self", "all_excluding_self"] or action.target_count == 999:
-            if action.target_type == "none": return []
-            if action.target_type == "self": return [actor]
-            if action.target_type == "all_excluding_self": return [u for u in all_units if u != actor and u.hp > 0]
-            if action.target_count == 999: return candidates
+        if action.target_type == "none": return []
+        if action.target_type == "self": return [actor]
+        if action.target_type == "all_excluding_self": return [u for u in all_units if u != actor and u.hp > 0]
+        if action.target_count == 999: return candidates
 
         count = min(action.target_count, len(candidates))
         if count == 0 or len(candidates) == 0: return []
+        
+        # KEY LOGIC: If exact match, early return WITHOUT incrementing seed!
+        if count == len(candidates):
+            return candidates
         
         targets = []
         for i in range(count):

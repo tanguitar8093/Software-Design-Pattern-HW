@@ -25,9 +25,8 @@ class Unit:
         self.cause_damage(target, self.str)
 
     def cause_damage(self, target: Unit, amount: int):
-        from models.states.cheered_up_state import CheeredUpState
         bonus = 0
-        if isinstance(self.current_state, CheeredUpState):
+        if getattr(self, "current_state", None) and self.current_state.__class__.__name__ == "CheeredUpState":
             bonus = 50
         print(f"[{self.troop_id}]{self.name} 對 [{target.troop_id}]{target.name} 造成 {amount + bonus} 點傷害。")
         target.take_damage(amount + bonus)

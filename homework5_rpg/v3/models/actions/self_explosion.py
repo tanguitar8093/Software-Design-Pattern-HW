@@ -6,7 +6,9 @@ class SelfExplosion(Action):
     def __init__(self):
         super().__init__("自爆", 200, 999, "all_excluding_self")
     def execute(self, actor: Unit, targets: List[Unit]):
-        print(f"{actor.name} uses SelfExplosion")
-        actor.take_damage(actor.hp) # Die
+        target_names = ", ".join([f"[{t.troop_id}]{t.name}" for t in targets])
+        print(f"[{actor.troop_id}]{actor.name} 對 {target_names} 使用了 自爆。")
         for target in targets:
-            target.take_damage(100) # True damage or regular? Let's use take_damage directly.
+            if target != actor:
+                actor.cause_damage(target, 150)
+        actor.take_damage(actor.hp)

@@ -8,17 +8,17 @@ if TYPE_CHECKING:
 
 class HumanStrategy(DecisionStrategy):
     def select_action(self, actor: Unit) -> Action:
-        print(f"Select an action for {actor.name}:")
+        options = []
         for i, s in enumerate(actor.skills):
-            print(f"({i}) {s.name} (MP: {s.mp_cost})")
+            options.append(f"({i}) {s.name}")
+        print(f"選擇行動：{' '.join(options)}")
         while True:
             try:
-                choice = int(input("> "))
+                choice = int(input())
                 if 0 <= choice < len(actor.skills):
                     return actor.skills[choice]
-                print("Invalid choice. Try again.")
             except ValueError:
-                print("Invalid input. Enter a number.")
+                pass
                 
     def select_targets(self, actor: Unit, action: Action, all_units: List[Unit]) -> List[Unit]:
         candidates = []
@@ -41,19 +41,23 @@ class HumanStrategy(DecisionStrategy):
         count = min(action.target_count, len(candidates))
         if count == 0:
             return []
+            
+        if count == len(candidates):
+            return candidates
 
-        print(f"Select {count} target(s) for {action.name}:")
+        options = []
         for i, c in enumerate(candidates):
-            print(f"({i}) {c.name} (HP: {c.hp}, State: {c.current_state.name})")
+            options.append(f"({i}) [{c.troop_id}]{c.name}")
+        print(f"選擇 {count} 位目標: {' '.join(options)}")
             
         targets = []
         while len(targets) < count:
             try:
-                choice = int(input(f"Target {len(targets) + 1}/{count} > "))
-                if 0 <= choice < len(candidates):
-                    targets.append(candidates[choice])
-                else:
-                    print("Invalid choice. Try again.")
+                choices_str = input()
+                choices = [int(c.strip()) for c in choices_str.split(",")]
+                for choice in choices:
+                    if 0 <= choice < len(candidates) and len(targets) < count:
+                        targets.append(candidates[choice])
             except ValueError:
-                print("Invalid input. Enter a number.")
+                pass
         return targets

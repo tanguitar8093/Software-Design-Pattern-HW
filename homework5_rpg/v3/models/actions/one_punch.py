@@ -14,6 +14,8 @@ class OnePunch(Action):
         self.chain_head.next.next = CheeredUpHandler()
         self.chain_head.next.next.next = NormalHandler()
     def execute(self, actor: Unit, targets: List[Unit]):
-        print(f"{actor.name} uses OnePunch on {[t.name for t in targets]}")
+        target_names = ", ".join([f"[{t.troop_id}]{t.name}" for t in targets])
+        print(f"[{actor.troop_id}]{actor.name} 對 {target_names} 使用了 一拳攻擊。")
+        
         for target in targets:
             self.chain_head.handle(actor, target)
