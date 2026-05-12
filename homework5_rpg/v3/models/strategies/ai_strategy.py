@@ -1,25 +1,35 @@
+from __future__ import annotations
+from models.unit import Unit
 from typing import List
 from models.strategies.decision_strategy import DecisionStrategy
 
 class AIStrategy(DecisionStrategy):
-    def __init__(self, seed: int = 0):
-        self.seed = seed
+    def __init__(self):
+        self.seed = 0
 
-    def select_action_index(self, actor, num_actions: int) -> int:
-        # AI decision for action: self.seed % num_actions
-        action_idx = self.seed % num_actions
+    def select_action(self, actor: Unit) -> Action:
+        choice = actor.skills[self.seed % len(actor.skills)]
         self.seed += 1
-        return action_idx
+        return choice
+        
+    def select_targets(self, actor: Unit, action: Action, all_units: List[Unit]) -> List[Unit]:
+        candidates = []
+        if action.target_type == "enemy":
+            candidates = [u for u in all_units if u.is_hero != actor.is_hero and u.hp > 0]
+        elif action.target_type == "ally_not_self":
+            candidates = [u for u in all_units if u.is_hero == actor.is_hero and u != actor and u.hp > 0]
+            
+        if action.target_type in ["none", "self", "all_excluding_self"] or action.target_count == 999:
+            if action.target_type == "none": return []
+            if action.target_type == "self": return [actor]
+            if action.target_type == "all_excluding_self": return [u for u in all_units if u != actor and u.hp > 0]
+            if action.target_count == 999: return candidates
 
-    def select_targets(self, actor, num_targets: int, candidates: List) -> List:
-        n = len(candidates)
-        if n == 0 or num_targets == 0:
-            self.seed += 1
-            return []
+        count = min(action.target_count, len(candidates))
+        if count == 0 or len(candidates) == 0: return []
         
         targets = []
-        for i in range(num_targets):
-            targets.append(candidates[(self.seed + i) % n])
-            
+        for i in range(count):
+            targets.append(candidates[(self.seed + i) % len(candidates)])
         self.seed += 1
         return targets

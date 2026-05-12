@@ -1,5 +1,5 @@
+from __future__ import annotations
 from typing import List
-from models.observers.observers import DeathObserver
 
 class Unit:
     def __init__(self, name: str, hp: int, mp: int, str_: int, is_hero: bool = False):
@@ -7,24 +7,41 @@ class Unit:
         self.hp = hp
         self.mp = mp
         self.str = str_
-        self.current_state = None  # to be initialized
+        self.is_hero = is_hero
+        
+        from models.states.normal_state import NormalState
+        self.current_state = NormalState()
         self.strategy = None
         self.skills = []
-        self.observers: List[DeathObserver] = []
-        self.is_hero = is_hero
+        self.observers = []
         self.troop = None
+        self.enemy_troop = None
+
+    def attack(self, target: Unit):
+        self.cause_damage(target, self.str)
+
+    def cause_damage(self, target: Unit, amount: int):
+        from models.states.cheered_up_state import CheeredUpState
+        bonus = 0
+        if isinstance(self.current_state, CheeredUpState):
+            bonus = 50
+        target.take_damage(amount + bonus)
 
     def take_damage(self, amt: int):
+        if self.hp <= 0: return
         self.hp -= amt
         if self.hp <= 0:
             self.hp = 0
             self.notify()
 
+    def heal(self, amt: int):
+        if self.hp > 0:
+            self.hp += amt
+
     def change_state(self, new_state):
         self.current_state = new_state
-        self.current_state.on_round_begin(self)
 
-    def attach(self, obs: DeathObserver):
+    def attach(self, obs):
         if obs not in self.observers:
             self.observers.append(obs)
 

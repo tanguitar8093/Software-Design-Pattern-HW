@@ -1,41 +1,56 @@
-from typing import List, Callable
+from __future__ import annotations
+from models.unit import Unit
+from typing import List
 from models.strategies.decision_strategy import DecisionStrategy
-import sys
 
 class HumanStrategy(DecisionStrategy):
-    def __init__(self, input_provider: Callable[[], str] = input):
-        """
-        input_provider defaults to `input` but can be overridden 
-        for automated testing with mock inputs.
-        """
-        self.input_provider = input_provider
-
-    def select_action_index(self, actor, num_actions: int) -> int:
+    def select_action(self, actor: Unit) -> Action:
+        print(f"Select an action for {actor.name}:")
+        for i, s in enumerate(actor.skills):
+            print(f"({i}) {s.name} (MP: {s.mp_cost})")
         while True:
             try:
-                line = self.input_provider().strip()
-                if not line:
-                    continue
-                # Expected to be a single index for action selection
-                idx = int(line.split(',')[0].strip())
-                return idx
-            except Exception:
-                pass # Can add simple print for retrying if necessary
-
-    def select_targets(self, actor, num_targets: int, candidates: List) -> List:
-        while True:
-            try:
-                line = self.input_provider().strip()
-                if not line:
-                    continue
-                indices_str = line.split(',')
-                target_indices = [int(idx.strip()) for idx in indices_str]
+                choice = int(input("> "))
+                if 0 <= choice < len(actor.skills):
+                    return actor.skills[choice]
+                print("Invalid choice. Try again.")
+            except ValueError:
+                print("Invalid input. Enter a number.")
                 
-                # Depending on the precise game rule, sometimes the user input can provide
-                # the exact number of targets. We return them based on the candidates list.
-                # If they provide too few or too many, we might need them to re-enter, 
-                # but following the prompt: it's guaranteed to be correct format.
-                targets = [candidates[i] for i in target_indices[:num_targets]]
-                return targets
-            except Exception:
-                pass
+    def select_targets(self, actor: Unit, action: Action, all_units: List[Unit]) -> List[Unit]:
+        candidates = []
+        if action.target_type == "enemy":
+            candidates = [u for u in all_units if u.is_hero != actor.is_hero and u.hp > 0]
+        elif action.target_type == "ally_not_self":
+            candidates = [u for u in all_units if u.is_hero == actor.is_hero and u != actor and u.hp > 0]
+            
+        if action.target_type in ["none", "self", "all_excluding_self"] or action.target_count == 999:
+            # Automatic targeting
+            if action.target_type == "none":
+                return []
+            if action.target_type == "self":
+                return [actor]
+            if action.target_type == "all_excluding_self":
+                return [u for u in all_units if u != actor and u.hp > 0]
+            if action.target_count == 999:
+                return candidates
+
+        count = min(action.target_count, len(candidates))
+        if count == 0:
+            return []
+
+        print(f"Select {count} target(s) for {action.name}:")
+        for i, c in enumerate(candidates):
+            print(f"({i}) {c.name} (HP: {c.hp}, State: {c.current_state.name})")
+            
+        targets = []
+        while len(targets) < count:
+            try:
+                choice = int(input(f"Target {len(targets) + 1}/{count} > "))
+                if 0 <= choice < len(candidates):
+                    targets.append(candidates[choice])
+                else:
+                    print("Invalid choice. Try again.")
+            except ValueError:
+                print("Invalid input. Enter a number.")
+        return targets
