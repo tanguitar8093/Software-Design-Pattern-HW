@@ -1,6 +1,7 @@
 # PlantUML 快速預覽（最小安裝）
 
 這份設定走 **PlantUML Server**，不需要本機安裝 Java / Graphviz。
+> ⚠️ 圖內容會送到外部 PlantUML 伺服器。若有敏感資料，請改用自架 `plantuml.server`。
 
 ## 使用方式
 
