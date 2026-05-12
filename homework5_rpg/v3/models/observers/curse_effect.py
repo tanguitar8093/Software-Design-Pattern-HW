@@ -9,6 +9,7 @@ class CurseEffect(DeathObserver):
     def on_unit_death(self, dead_unit: Unit):
         if self.curser.hp > 0:
             self.curser.hp += dead_unit.mp
+            print(f"[{self.curser.name}'s Curse triggered] Absorbed {dead_unit.mp} MP from {dead_unit.name}!")
 
     def __eq__(self, other):
         if isinstance(other, CurseEffect):

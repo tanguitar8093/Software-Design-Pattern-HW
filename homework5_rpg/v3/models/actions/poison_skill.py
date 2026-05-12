@@ -7,5 +7,6 @@ class PoisonSkill(Action):
     def __init__(self):
         super().__init__("下毒", 80, 1, "enemy")
     def execute(self, actor: Unit, targets: List[Unit]):
+        print(f"{actor.name} uses Poison on {[t.name for t in targets]}")
         for target in targets:
             target.change_state(PoisonedState())

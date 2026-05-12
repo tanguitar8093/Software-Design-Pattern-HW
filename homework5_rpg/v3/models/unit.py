@@ -25,6 +25,7 @@ class Unit:
         bonus = 0
         if isinstance(self.current_state, CheeredUpState):
             bonus = 50
+        print(f"{self.name} causes {amount + bonus} damage to {target.name}.")
         target.take_damage(amount + bonus)
 
     def take_damage(self, amt: int):
@@ -32,6 +33,7 @@ class Unit:
         self.hp -= amt
         if self.hp <= 0:
             self.hp = 0
+            print(f"{self.name} died.")
             self.notify()
 
     def heal(self, amt: int):
