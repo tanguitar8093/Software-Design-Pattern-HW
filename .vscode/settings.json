@@ -1,0 +1,9 @@
+{
+  "plantuml.commandArgs": [
+    "-Djava.awt.headless=true"
+  ],
+  "plantuml.server": "",
+  "plantuml.render": "local",
+  "plantuml.jar": "",
+  "plantuml.graphvizDot": "/usr/bin/dot"
+}
