@@ -1,5 +1,5 @@
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from battle_engine import BattleEngine
 from models.actions.action import Action
@@ -19,7 +19,9 @@ from models.strategies.ai_strategy import AIStrategy
 from models.strategies.human_strategy import HumanStrategy
 from models.unit import Unit
 
-SKILL_TYPES: dict[ActionName, type[Action]] = {
+SkillFactory = Callable[[], Action]
+
+SKILL_TYPES: dict[ActionName, SkillFactory] = {
     ActionName.BASIC_ATTACK: BasicAttack,
     ActionName.WATERBALL: Waterball,
     ActionName.FIREBALL: Fireball,
