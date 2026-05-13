@@ -1,13 +1,14 @@
-from __future__ import annotations
+from models.actions.action import Action
+from models.strategies.decision_strategy import (
+    DecisionStrategy,
+    select_fixed_targets,
+    select_target_candidates,
+)
 from models.unit import Unit
-from typing import List, TYPE_CHECKING
-from models.strategies.decision_strategy import DecisionStrategy
 
-if TYPE_CHECKING:
-    from models.actions.action import Action
 
 class AIStrategy(DecisionStrategy):
-    def __init__(self):
+    def __init__(self) -> None:
         self.seed = 0
 
     def select_action(self, actor: Unit) -> Action:
@@ -18,27 +19,20 @@ class AIStrategy(DecisionStrategy):
         choice = actor.skills[self.seed % len(actor.skills)]
         self.seed += 1
         return choice
-        
-    def select_targets(self, actor: Unit, action: Action, all_units: List[Unit]) -> List[Unit]:
-        candidates = []
-        if action.target_type == "enemy":
-            candidates = [u for u in all_units if u.is_hero != actor.is_hero and u.hp > 0]
-        elif action.target_type == "ally_not_self":
-            candidates = [u for u in all_units if u.is_hero == actor.is_hero and u != actor and u.hp > 0]
-            
-        if action.target_type == "none": return []
-        if action.target_type == "self": return [actor]
-        if action.target_type == "all_excluding_self": return [u for u in all_units if u != actor and u.hp > 0]
-        if action.target_count == 999: return candidates
+
+    def select_targets(self, actor: Unit, action: Action, all_units: list[Unit]) -> list[Unit]:
+        candidates = select_target_candidates(actor, action, all_units)
+        fixed_targets = select_fixed_targets(actor, action, all_units, candidates)
+        if fixed_targets is not None:
+            return fixed_targets
 
         count = min(action.target_count, len(candidates))
-        if count == 0 or len(candidates) == 0: return []
-        
-        # KEY LOGIC: If exact match, early return WITHOUT incrementing seed!
+        if count == 0:
+            return []
         if count == len(candidates):
             return candidates
-        
-        targets = []
+
+        targets: list[Unit] = []
         for i in range(count):
             targets.append(candidates[(self.seed + i) % len(candidates)])
         self.seed += 1

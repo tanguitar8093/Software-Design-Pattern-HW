@@ -1,11 +1,12 @@
-from __future__ import annotations
-from models.unit import Unit
 from models.cor.handler import Handler
+from models.states.petrochemical_state import PetrochemicalState
+from models.states.poisoned_state import PoisonedState
+from models.unit import Unit
+
 
 class DebuffHandler(Handler):
     def do_handle(self, actor: Unit, target: Unit) -> bool:
-        state_name = target.current_state.name if target.current_state else "正常"
-        if state_name in ["中毒", "石化"]:
+        if isinstance(target.current_state, (PoisonedState, PetrochemicalState)):
             for _ in range(3):
                 if target.hp <= 0:
                     break

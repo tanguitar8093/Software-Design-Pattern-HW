@@ -1,10 +1,9 @@
-from __future__ import annotations
 from models.unit import Unit
 from models.states.state import State
 
 
 class PoisonedState(State):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("中毒", 3)
         self.dot_damage = 30
 

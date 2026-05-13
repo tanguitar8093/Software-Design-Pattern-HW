@@ -1,9 +1,10 @@
-from __future__ import annotations
-from models.unit import Unit
 from abc import ABC, abstractmethod
 
+from models.unit import Unit
+
+
 class Handler(ABC):
-    def __init__(self, next_handler: 'Handler' = None):
+    def __init__(self, next_handler: "Handler | None" = None) -> None:
         self.next = next_handler
 
     def handle(self, actor: Unit, target: Unit) -> bool:
@@ -15,4 +16,4 @@ class Handler(ABC):
 
     @abstractmethod
     def do_handle(self, actor: Unit, target: Unit) -> bool:
-        pass
+        """Handle the target if possible."""
