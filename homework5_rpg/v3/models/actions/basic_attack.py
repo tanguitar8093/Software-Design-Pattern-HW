@@ -1,10 +1,11 @@
 from models.actions.action import Action
+from models.enums import ActionName, TargetType
 from models.unit import Unit
 
 
 class BasicAttack(Action):
     def __init__(self) -> None:
-        super().__init__("普通攻擊", 0, 1, "enemy")
+        super().__init__(ActionName.BASIC_ATTACK, 0, 1, TargetType.ENEMY)
 
     def execute(self, actor: Unit, targets: list[Unit]) -> None:
         for target in targets:

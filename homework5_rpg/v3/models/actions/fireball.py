@@ -1,14 +1,13 @@
 from models.actions.action import Action
+from models.enums import ActionName, TargetType
 from models.unit import Unit
 
 
 class Fireball(Action):
     def __init__(self) -> None:
-        super().__init__("火球", 50, 999, "enemy")
+        super().__init__(ActionName.FIREBALL, 50, 999, TargetType.ENEMY)
 
     def execute(self, actor: Unit, targets: list[Unit]) -> None:
-        target_names = ", ".join(f"[{target.troop_id}]{target.name}" for target in targets)
-        print(f"[{actor.troop_id}]{actor.name} 對 {target_names} 使用了 火球。")
-
+        self.announce_targeted_use(actor, targets)
         for target in targets:
             actor.cause_damage(target, 50)

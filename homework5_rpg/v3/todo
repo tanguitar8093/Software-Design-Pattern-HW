@@ -1,0 +1,3 @@
+- [] hardcode to enums
+    ex. actions.py ->  # "enemy", "ally", "all", "self", "none"
+    ex. cheerup_skill.py -> 鼓舞

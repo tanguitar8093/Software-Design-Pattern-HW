@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 
+from models.enums import StateName
 from models.unit import Unit
 
 
 class State(ABC):
-    def __init__(self, name: str, remaining_rounds: int) -> None:
+    def __init__(self, name: StateName, remaining_rounds: int) -> None:
         self.name = name
         self.remaining_rounds = remaining_rounds
 

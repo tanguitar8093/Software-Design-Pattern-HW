@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Iterable
 
 from battle_engine import BattleEngine
 from models.actions.action import Action
@@ -13,50 +14,57 @@ from models.actions.self_explosion import SelfExplosion
 from models.actions.self_healing import SelfHealing
 from models.actions.summon import Summon
 from models.actions.waterball import Waterball
+from models.enums import ActionName, ArmyCommand, SpecialUnitName
 from models.strategies.ai_strategy import AIStrategy
 from models.strategies.human_strategy import HumanStrategy
 from models.unit import Unit
 
-SKILL_TYPES: dict[str, type[Action]] = {
-    "普通攻擊": BasicAttack,
-    "水球": Waterball,
-    "火球": Fireball,
-    "自我治療": SelfHealing,
-    "石化": PetrochemicalSkill,
-    "下毒": PoisonSkill,
-    "召喚": Summon,
-    "自爆": SelfExplosion,
-    "鼓舞": CheerupSkill,
-    "詛咒": CurseSkill,
-    "一拳攻擊": OnePunch,
+SKILL_TYPES: dict[ActionName, type[Action]] = {
+    ActionName.BASIC_ATTACK: BasicAttack,
+    ActionName.WATERBALL: Waterball,
+    ActionName.FIREBALL: Fireball,
+    ActionName.SELF_HEALING: SelfHealing,
+    ActionName.PETROCHEMICAL: PetrochemicalSkill,
+    ActionName.POISON: PoisonSkill,
+    ActionName.SUMMON: Summon,
+    ActionName.SELF_EXPLOSION: SelfExplosion,
+    ActionName.CHEERUP: CheerupSkill,
+    ActionName.CURSE: CurseSkill,
+    ActionName.ONE_PUNCH: OnePunch,
 }
 
 DEFAULT_HERO_SKILL_NAMES = (
-    "普通攻擊",
-    "水球",
-    "火球",
-    "自我治療",
-    "石化",
-    "下毒",
-    "召喚",
-    "自爆",
-    "鼓舞",
-    "詛咒",
-    "一拳攻擊",
+    ActionName.BASIC_ATTACK,
+    ActionName.WATERBALL,
+    ActionName.FIREBALL,
+    ActionName.SELF_HEALING,
+    ActionName.PETROCHEMICAL,
+    ActionName.POISON,
+    ActionName.SUMMON,
+    ActionName.SELF_EXPLOSION,
+    ActionName.CHEERUP,
+    ActionName.CURSE,
+    ActionName.ONE_PUNCH,
 )
 
 
 def get_skill_by_name(name: str) -> Action | None:
-    skill_type = SKILL_TYPES.get(name)
+    try:
+        action_name = ActionName(name)
+    except ValueError:
+        return None
+
+    skill_type = SKILL_TYPES.get(action_name)
     if skill_type is None:
         return None
     return skill_type()
 
 
-def build_skills(skill_names: list[str]) -> list["Action"]:
+def build_skills(skill_names: Iterable[str | ActionName]) -> list[Action]:
     skills: list[Action] = []
     for skill_name in skill_names:
-        skill = get_skill_by_name(skill_name.strip())
+        normalized_name = skill_name if isinstance(skill_name, ActionName) else skill_name.strip()
+        skill = get_skill_by_name(normalized_name)
         if skill is not None:
             skills.append(skill)
 
@@ -82,9 +90,9 @@ def main() -> None:
 
             if line.isdigit():
                 troop_size = int(line)
-                hero = Unit("英雄", 500, 500, 100, is_hero=True)
+                hero = Unit(SpecialUnitName.HERO, 500, 500, 100, is_hero=True)
                 hero.strategy = HumanStrategy()
-                hero.skills = build_skills(list(DEFAULT_HERO_SKILL_NAMES))
+                hero.skills = build_skills(DEFAULT_HERO_SKILL_NAMES)
                 t1_units.append(hero)
                 for i in range(1, troop_size):
                     ally = Unit(f"Ally_{i}", 300, 200, 50, is_hero=True)
@@ -98,19 +106,19 @@ def main() -> None:
                     t2_units.append(monster)
                 break
 
-            if line == "#軍隊-1-開始":
+            if line == ArmyCommand.TROOP_1_START:
                 current_troop = 1
                 continue
-            elif line == "#軍隊-1-結束":
+            if line == ArmyCommand.TROOP_1_END:
                 current_troop = 0
                 continue
-            elif line == "#軍隊-2-開始":
+            if line == ArmyCommand.TROOP_2_START:
                 current_troop = 2
                 continue
-            elif line == "#軍隊-2-結束":
+            if line == ArmyCommand.TROOP_2_END:
                 break
 
-            if current_troop in [1, 2]:
+            if current_troop in {1, 2}:
                 parts = line.split()
                 if len(parts) >= 4:
                     name = parts[0]
@@ -120,7 +128,7 @@ def main() -> None:
                     is_hero = current_troop == 1
                     unit = Unit(name, hp, mp, str_, is_hero)
 
-                    if current_troop == 1 and name == "英雄":
+                    if current_troop == 1 and name == SpecialUnitName.HERO:
                         unit.strategy = HumanStrategy()
                     else:
                         unit.strategy = AIStrategy()

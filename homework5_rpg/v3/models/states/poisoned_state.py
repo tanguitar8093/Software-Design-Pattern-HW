@@ -1,10 +1,11 @@
+from models.enums import StateName
 from models.unit import Unit
 from models.states.state import State
 
 
 class PoisonedState(State):
     def __init__(self) -> None:
-        super().__init__("中毒", 3)
+        super().__init__(StateName.POISONED, 3)
         self.dot_damage = 30
 
     def on_round_begin(self, u: Unit) -> bool:
