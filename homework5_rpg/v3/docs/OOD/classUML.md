@@ -3,7 +3,7 @@ classDiagram
 direction TB
 
     %% --- 指揮官與核心實體 ---
-    class BattleEngine {
+    class RPG {
         -list~Unit~ troop1
         -list~Unit~ troop2
         +run_battle()
@@ -29,7 +29,7 @@ direction TB
         +change_state(new_state)
     }
 
-    BattleEngine "1" *-- "many" Unit : manages
+    RPG "1" *-- "many" Unit : manages
     Unit ..|> DeathSubject
 
     %% --- 1. 策略模式 (Strategy) ---

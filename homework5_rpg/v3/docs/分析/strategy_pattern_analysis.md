@@ -15,7 +15,7 @@
 
 **如果不使用策略模式，程式碼會長這樣（錯誤示範）：**
 
-在 `BattleEngine` 的 `run_battle()` 迴圈中，可能會塞滿巨大且難以維護的 `if-else` 判斷：
+在 `RPG` 的 `run_battle()` 迴圈中，可能會塞滿巨大且難以維護的 `if-else` 判斷：
 
 ```python
 # 沒有策略模式的爛代碼
@@ -35,7 +35,7 @@ else:
 
 - 將這兩套完全不同的決策演算法，抽成獨立的 `DecisionStrategy` 介面。
 - 並提供 `HumanStrategy` (玩家互動) 和 `AIStrategy` (電腦隨機決策) 的實作類別。
-- `BattleEngine` 和 `Unit` 都只需依賴介面，在 `run_battle()` 這樣執行即可：
+- `RPG` 和 `Unit` 都只需依賴介面，在 `run_battle()` 這樣執行即可：
   ```python
   # 實際的優雅代碼
   action = unit.strategy.select_action(unit)
@@ -46,11 +46,11 @@ else:
 
 ## 3. 套用模式前的 UML (未使用策略模式的緊耦合設計)
 
-在最糟糕的情況下，決策邏輯會通通堆在 `BattleEngine` 或 `Unit` 裡面，並且用 `if-else` 控制：
+在最糟糕的情況下，決策邏輯會通通堆在 `RPG` 或 `Unit` 裡面，並且用 `if-else` 控制：
 
 ```mermaid
 classDiagram
-    class BattleEngine {
+    class RPG {
         -troop1: List~Unit~
         -troop2: List~Unit~
         +run_battle()
@@ -61,15 +61,15 @@ classDiagram
         +is_hero: bool
     }
 
-    BattleEngine --> Unit
-    note for BattleEngine "run_battle() 裡面充滿著\n if (unit.is_hero) { 處理輸入 } \n else { 處理隨機 } 的冗長判斷"
+    RPG --> Unit
+    note for RPG "run_battle() 裡面充滿著\n if (unit.is_hero) { 處理輸入 } \n else { 處理隨機 } 的冗長判斷"
 ```
 
 ---
 
 ## 4. 套用模式後的 UML (本專案的實際架構)
 
-透過 `models/strategies/decision_strategy.py` 的抽離，`BattleEngine` 只管跑迴圈，`Unit` 本身也不用管自己是誰，通通交給身上帶的 `strategy`：
+透過 `models/strategies/decision_strategy.py` 的抽離，`RPG` 只管跑迴圈，`Unit` 本身也不用管自己是誰，通通交給身上帶的 `strategy`：
 
 ```mermaid
 classDiagram

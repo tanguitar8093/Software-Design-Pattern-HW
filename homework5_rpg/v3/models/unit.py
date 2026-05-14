@@ -1,3 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from models.actions.action import Action
+    from models.observers.death_observer import DeathObserver
+    from models.states.state import State
+    from models.strategies.decision_strategy import DecisionStrategy
+
+
 class Unit:
     def __init__(
         self,
@@ -15,18 +27,18 @@ class Unit:
 
         from models.states.normal_state import NormalState
 
-        self.current_state: "State" = NormalState()
-        self.strategy: "DecisionStrategy | None" = None
-        self.skills: list["Action"] = []
-        self.observers: list["DeathObserver"] = []
-        self.troop: list["Unit"] = []
-        self.enemy_troop: list["Unit"] = []
+        self.current_state: State = NormalState()
+        self.strategy: DecisionStrategy | None = None
+        self.skills: list[Action] = []
+        self.observers: list[DeathObserver] = []
+        self.troop: list[Unit] = []
+        self.enemy_troop: list[Unit] = []
         self.troop_id = 0
 
-    def attack(self, target: "Unit") -> None:
+    def attack(self, target: Unit) -> None:
         self.cause_damage(target, self.str)
 
-    def cause_damage(self, target: "Unit", amount: int) -> None:
+    def cause_damage(self, target: Unit, amount: int) -> None:
         from models.states.cheered_up_state import CheeredUpState
 
         bonus = 0
@@ -48,10 +60,10 @@ class Unit:
         if self.hp > 0:
             self.hp += amt
 
-    def change_state(self, new_state: "State") -> None:
+    def change_state(self, new_state: State) -> None:
         self.current_state = new_state
 
-    def attach(self, obs: "DeathObserver") -> None:
+    def attach(self, obs: DeathObserver) -> None:
         if obs not in self.observers:
             self.observers.append(obs)
 

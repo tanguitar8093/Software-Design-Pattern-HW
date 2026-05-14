@@ -1,7 +1,6 @@
 import sys
 from collections.abc import Callable, Iterable
 
-from battle_engine import BattleEngine
 from models.actions.action import Action
 from models.actions.basic_attack import BasicAttack
 from models.actions.cheerup_skill import CheerupSkill
@@ -18,6 +17,7 @@ from models.enums import ActionName, ArmyCommand, SpecialUnitName
 from models.strategies.ai_strategy import AIStrategy
 from models.strategies.human_strategy import HumanStrategy
 from models.unit import Unit
+from rpg import RPG
 
 SkillFactory = Callable[[], Action]
 
@@ -148,8 +148,8 @@ def main() -> None:
         pass
 
     if t1_units and t2_units:
-        engine = BattleEngine(t1_units, t2_units)
-        engine.run_battle()
+        rpg = RPG(t1_units, t2_units)
+        rpg.run_battle()
 
 if __name__ == "__main__":
     main()

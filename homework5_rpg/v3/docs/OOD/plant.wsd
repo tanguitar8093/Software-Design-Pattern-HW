@@ -24,7 +24,7 @@ interface DeathObserver <<interface>> {
   }
 
 ' ---核心單位 ---
-class BattleEngine {
+class RPG {
 
 - troop1: list
 - troop2: list
@@ -144,7 +144,7 @@ interface DeathSubject <<interface>> {
 
 ' --- 關係連線 (嚴格遵循 UI 路徑) ---
 
-BattleEngine "1" -- "many" Unit : manages >
+RPG "1" -- "many" Unit : manages >
 
 ' Observer 連結
 DeathObserver <|.. SummonerTrait

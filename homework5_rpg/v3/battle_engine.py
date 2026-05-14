@@ -1,6 +1,7 @@
 from models.unit import Unit
 
-class BattleEngine:
+
+class RPG:
     def __init__(self, troop1: list[Unit], troop2: list[Unit]) -> None:
         self.troop1 = troop1
         self.troop2 = troop2
@@ -13,13 +14,14 @@ class BattleEngine:
             unit.enemy_troop = self.troop1
             unit.troop_id = 2
 
-    def is_game_over(self) -> bool:
-        t1_alive = any(u.hp > 0 for u in self.troop1)
-        t2_alive = any(u.hp > 0 for u in self.troop2)
-        return not t1_alive or not t2_alive
+    def is_troop_annihilated(self, troop: list[Unit]) -> bool:
+        return not any(unit.hp > 0 for unit in troop)
+
+    def is_battle_over(self) -> bool:
+        return self.is_troop_annihilated(self.troop1) or self.is_troop_annihilated(self.troop2)
 
     def run_battle(self) -> None:
-        while not self.is_game_over():
+        while not self.is_battle_over():
             idx = 0
             while True:
                 all_units = self.troop1 + self.troop2
@@ -27,7 +29,7 @@ class BattleEngine:
                     break
                 unit = all_units[idx]
                 idx += 1
-                if unit.hp <= 0 or self.is_game_over():
+                if unit.hp <= 0 or self.is_battle_over():
                     continue
 
                 print(f"輪到 [{unit.troop_id}]{unit.name} (HP: {unit.hp}, MP: {unit.mp}, STR: {unit.str}, State: {unit.current_state.name})。")
@@ -57,10 +59,13 @@ class BattleEngine:
                     action.execute(unit, targets)
                     unit.current_state.countdown(unit)
 
-            if self.is_game_over():
+            if self.is_battle_over():
                 break
 
-        if any(u.hp > 0 for u in self.troop1):
+        if not self.is_troop_annihilated(self.troop1):
             print("你獲勝了！")
         else:
             print("你失敗了！")
+
+
+BattleEngine = RPG
