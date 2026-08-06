@@ -1,101 +1,116 @@
+# 處方診斷系統 OOD（責任鏈＋觀察者＋Facade）
+
 ```mermaid
 classDiagram
 direction TB
 
-    %% --- 實體模型 (Entities) ---
-    class PatientData {
-        +String id
-        +String name
-        +String gender
-        +int age
-        +float height
-        +float weight
-        +List~PatientCase~ patient_cases
-        +add_case(case)
-    }
+class Client {
+    +main() void
+}
 
-    class PatientCase {
-        +Prescription prescription
-        +List~String~ symptom_list
-        +DateTime case_time
-    }
+class PatientData {
+    +str id
+    +str name
+    +str gender
+    +int age
+    +float height
+    +float weight
+    +List~PatientCase~ patient_cases
+    +add_case(patient_case) void
+    +to_dict() dict
+}
 
-    class Prescription {
-        +String name
-        +String potential_disease
-        +List~String~ medicines
-        +String usage
-    }
+class PatientCase {
+    +Prescription prescription
+    +List~str~ symptoms
+    +datetime case_time
+    +to_dict() dict
+}
 
-    PatientData "1" *-- "*" PatientCase : contains
-    PatientCase "1" *-- "1" Prescription : has
+class Prescription {
+    +str name
+    +str potential_disease
+    +List~str~ medicines
+    +str usage
+    +to_dict() dict
+}
 
-    %% --- 核心系統 (Database & Prescriber) ---
-    class PatientDatabase {
-        -Map~String, PatientData~ patients
-        +import_from_json(file_path)
-        +get_patient(id) PatientData
-        +update_patient(patient)
-    }
+PatientData "1" *-- "0..*" PatientCase : patient_cases
+PatientCase "1" *-- "1" Prescription : prescription
 
-    class Prescriber {
-        -DiagnosisHandler rule_chain_head
-        -Queue demands_queue
-        -List~PrescriptionObserver~ observers
-        +set_rule_chain(handler)
-        +add_observer(obs)
-        +prescribe(patient, symptoms) 
-        -worker_loop() %% 後台執行緒：取任務、等待3秒、呼叫 chain、通知 observers
-    }
-    
-    Prescriber ..> PatientData : 讀取資料
+class PatientDatabase {
+    -Dict~str, PatientData~ patients
+    +load_from_json(file_path) void
+    +get_patient(patient_id) PatientData
+}
 
-    %% --- 1. 責任鏈模式 (Chain of Responsibility) - 解決 B-3, C-2 ---
-    class DiagnosisHandler {
-        <<abstract>>
-        -DiagnosisHandler next_handler
-        +set_next(handler) DiagnosisHandler
-        +handle(patient, symptoms)* Prescription
-    }
-    class Covid19Handler {
-        +handle(patient, symptoms) Prescription
-    }
-    class AttractiveHandler {
-        +handle(patient, symptoms) Prescription
-    }
-    class SleepApneaHandler {
-        +handle(patient, symptoms) Prescription
-    }
+class PrescriptionDemand {
+    +PatientData patient
+    +List~str~ symptoms
+}
 
-    DiagnosisHandler <|-- Covid19Handler
-    DiagnosisHandler <|-- AttractiveHandler
-    DiagnosisHandler <|-- SleepApneaHandler
-    DiagnosisHandler --> DiagnosisHandler : next_handler
-    Prescriber o-- "1" DiagnosisHandler : 頭部節點
+class Prescriber {
+    -DiagnosisHandler rule_chain_head
+    -Queue~PrescriptionDemand~ demands_queue
+    -List~Callable~ observers
+    +set_rule_chain(handler) void
+    +add_observer(callback) void
+    +prescribe(patient, symptoms) void
+    -_worker_loop() void
+    -_notify_observers(patient, symptoms, prescription) void
+    +stop() void
+}
 
-    %% --- 2. 觀察者模式 (Observer) - 解決 B-2 ---
-    class PrescriptionObserver {
-        <<interface>>
-        +on_diagnosed(patient, symptoms, prescription)*
-    }
-    class ExportAndSaveObserver {
-        -String export_format
-        -PatientDatabase db
-        +on_diagnosed() %% 觸發儲存回 DB，並匯出 CSV 或 JSON
-    }
+Prescriber *-- "1" PrescriptionDemand : FIFO queue
+Prescriber o-- "0..*" "callback" ExportAndSaveObserver : on_diagnosed
 
-    PrescriptionObserver <|.. ExportAndSaveObserver
-    Prescriber o-- "*" PrescriptionObserver : 通知
+class DiagnosisHandler {
+    <<abstract>>
+    -DiagnosisHandler _next_handler
+    +set_next(handler) DiagnosisHandler
+    +handle(patient, symptoms) Prescription
+}
 
-    %% --- 3. 門面模式 (Facade) - 解決 C-3 ---
-    class PrescriberSystemFacade {
-        -PatientDatabase db
-        -Prescriber prescriber
-        +run_diagnosis(json_path, txt_path, patient_id, symptoms, format)
-        -build_rule_chain_from_txt(txt_path) DiagnosisHandler
-    }
+class Covid19Handler {
+    +handle(patient, symptoms) Prescription
+}
+class AttractiveHandler {
+    +handle(patient, symptoms) Prescription
+}
+class SleepApneaHandler {
+    +handle(patient, symptoms) Prescription
+}
 
-    PrescriberSystemFacade --> PatientDatabase : 初始化與操作
-    PrescriberSystemFacade --> Prescriber : 初始化與操作
-    PrescriberSystemFacade ..> ExportAndSaveObserver : 註冊給 Prescriber
+DiagnosisHandler <|-- Covid19Handler
+DiagnosisHandler <|-- AttractiveHandler
+DiagnosisHandler <|-- SleepApneaHandler
+DiagnosisHandler --> "0..1" DiagnosisHandler : next handler
+Prescriber o-- "0..1" DiagnosisHandler : rule_chain_head
+DiagnosisHandler ..> PatientData : evaluates
+DiagnosisHandler ..> Prescription : creates
+
+class ExportAndSaveObserver {
+    -PatientDatabase db
+    -str export_format
+    -str export_file
+    +on_diagnosed(patient, symptoms, prescription) void
+    -_export_json() void
+    -_export_csv(patient, patient_case) void
+}
+
+ExportAndSaveObserver --> PatientDatabase : stores case / exports
+ExportAndSaveObserver ..> PatientCase : creates
+
+class PrescriberSystemFacade {
+    -PatientDatabase db
+    -Prescriber prescriber
+    +run_diagnosis(json_path, diseases_txt_path, patient_id, symptoms, export_format, export_file) void
+    -_build_rule_chain(diseases_txt_path) DiagnosisHandler
+}
+
+PrescriberSystemFacade *-- PatientDatabase : owns
+PrescriberSystemFacade *-- Prescriber : owns
+PrescriberSystemFacade ..> DiagnosisHandler : builds from disease TXT
+PrescriberSystemFacade ..> ExportAndSaveObserver : creates / registers callback
+Client --> PrescriberSystemFacade : one-call diagnosis
 ```
