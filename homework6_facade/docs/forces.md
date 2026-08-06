@@ -17,7 +17,6 @@ PatientDataBass, Client
 
 Force-BV 輸入比對型
 
-force1
 [Prescriber.Prescrib] 執行時, 系統會先解析 [Symptom 症狀] 的類型
 每一類對應的處理行為不同, 好比
 [咳嗽打噴嚏 會用清冠一號]
