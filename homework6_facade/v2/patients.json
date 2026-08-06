@@ -1,0 +1,26 @@
+[
+    {
+        "id": "A123456789",
+        "name": "Tom",
+        "gender": "male",
+        "age": 25,
+        "height": 175.0,
+        "weight": 70.0
+    },
+    {
+        "id": "B987654321",
+        "name": "Jerry",
+        "gender": "male",
+        "age": 40,
+        "height": 170.0,
+        "weight": 100.0
+    },
+    {
+        "id": "C111111111",
+        "name": "Alice",
+        "gender": "female",
+        "age": 18,
+        "height": 160.0,
+        "weight": 50.0
+    }
+]

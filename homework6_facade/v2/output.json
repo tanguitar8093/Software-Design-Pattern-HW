@@ -1,0 +1,15 @@
+{
+    "patient_id": "C111111111",
+    "symptoms": [
+        "Sneeze"
+    ],
+    "prescription": {
+        "name": "青春抑制劑",
+        "potential_disease": "Attractive",
+        "medicines": [
+            "假鬢角",
+            "臭味"
+        ],
+        "usage": "把假鬢角黏在臉的兩側，讓自己異性緣差一點，自然就不會有人想妳了。"
+    }
+}
