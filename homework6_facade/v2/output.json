@@ -88,5 +88,50 @@
             ],
             "usage": "把假鬢角黏在臉的兩側，讓自己異性緣差一點，自然就不會有人想妳了。"
         }
+    },
+    {
+        "patient_id": "A123456789",
+        "symptoms": [
+            "Headache",
+            "Cough",
+            "Sneeze"
+        ],
+        "prescription": {
+            "name": "清冠一號",
+            "potential_disease": "COVID-19",
+            "medicines": [
+                "清冠一號"
+            ],
+            "usage": "將相關藥材裝入茶包裡，使用500 mL 溫、熱水沖泡悶煮1~3 分鐘後即可飲用。"
+        }
+    },
+    {
+        "patient_id": "B987654321",
+        "symptoms": [
+            "Snore"
+        ],
+        "prescription": {
+            "name": "打呼抑制劑",
+            "potential_disease": "SleepApneaSyndrome",
+            "medicines": [
+                "一捲膠帶"
+            ],
+            "usage": "睡覺時，撕下兩塊膠帶，將兩塊膠帶交錯黏在關閉的嘴巴上，就不會打呼了。"
+        }
+    },
+    {
+        "patient_id": "C111111111",
+        "symptoms": [
+            "Sneeze"
+        ],
+        "prescription": {
+            "name": "青春抑制劑",
+            "potential_disease": "Attractive",
+            "medicines": [
+                "假鬢角",
+                "臭味"
+            ],
+            "usage": "把假鬢角黏在臉的兩側，讓自己異性緣差一點，自然就不會有人想妳了。"
+        }
     }
 ]

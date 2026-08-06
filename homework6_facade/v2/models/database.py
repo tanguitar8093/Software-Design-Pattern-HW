@@ -21,9 +21,9 @@ class PatientDatabase:
                 self.patients[patient.id] = patient
 
     def get_patient(self, id: str) -> PatientData:
-        return self.patients.get(id)
+        return self.patients.get(id) # 這個 .get(id), 是會依據 id 拿到整個 PatientData, 還是只有 id
 
-    def add_patient_case(self, id: str, patient_case: PatientCase):
+    def add_patient_case(self, id: str, patient_case: PatientCase): # 這是私有方法, 應該用私有方式方式寫 code
         patient = self.get_patient(id)
         if patient:
             patient.add_case(patient_case)

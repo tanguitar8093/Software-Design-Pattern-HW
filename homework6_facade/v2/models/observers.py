@@ -8,7 +8,7 @@ from .enums import Symptom
 from .database import PatientDatabase
 from .entities import PatientCase
 
-class IPrescriberObserver(ABC):
+class IPrescriberObserver(ABC): # 這個 I...Observer 的命名風格怎麼來的
     @abstractmethod
     def update(self, patient_id: str, symptoms: list[Symptom], prescription: Prescription):
         pass
