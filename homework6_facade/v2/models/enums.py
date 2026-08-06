@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Symptom(Enum):
     HEADACHE = "Headache"
     COUGH = "Cough"

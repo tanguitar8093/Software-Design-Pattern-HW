@@ -1,16 +1,17 @@
-from typing import List, Optional
 from datetime import datetime
-from .enums import Symptom, PotentialDisease
+
+from .enums import PotentialDisease, Symptom
+
 
 class Prescription:
-    def __init__(self, name: str, potential_disease: PotentialDisease, medicines: List[str], usage: str):
+    def __init__(self, name: str, potential_disease: PotentialDisease, medicines: list[str], usage: str):
         self.name = name
         self.potential_disease = potential_disease
         self.medicines = medicines
         self.usage = usage
 
 class PatientCase:
-    def __init__(self, case_time: datetime, symptoms: List[Symptom], prescription: Optional[Prescription] = None):
+    def __init__(self, case_time: datetime, symptoms: list[Symptom], prescription: Prescription | None):
         self.case_time = case_time
         self.symptoms = symptoms
         self.prescription = prescription
@@ -23,7 +24,7 @@ class PatientData:
         self.age = age
         self.height = height
         self.weight = weight
-        self.cases: List[PatientCase] = []
+        self.cases: list[PatientCase] = []
 
     def add_case(self, case: PatientCase):
         self.cases.append(case)

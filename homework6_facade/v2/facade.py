@@ -1,8 +1,8 @@
-from typing import List
 from models.database import PatientDatabase
-from models.prescriber import Prescriber
 from models.enums import Symptom
-from models.observers import CaseRecordObserver, JsonExportObserver, CsvExportObserver
+from models.observers import CaseRecordObserver, CsvExportObserver, JsonExportObserver
+from models.prescriber import Prescriber
+
 
 class PrescriptionSystemFacade:
     def __init__(self, patients_json: str, diseases_txt: str):
@@ -21,7 +21,7 @@ class PrescriptionSystemFacade:
         elif format_type.upper() == "CSV":
             self.prescriber.attach_observer(CsvExportObserver(file_path))
 
-    def diagnose(self, patient_id: str, symptoms: List[Symptom]):
+    def diagnose(self, patient_id: str, symptoms: list[Symptom]):
         self.prescriber.prescribe(patient_id, symptoms)
 
     def wait_for_completion(self):

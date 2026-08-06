@@ -1,17 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+
 from .entities import PatientData, Prescription
-from .enums import Symptom, PotentialDisease
+from .enums import PotentialDisease, Symptom
+
 
 class PrescribeRule(ABC):
     def __init__(self):
-        self.next_rule: Optional['PrescribeRule'] = None
+        self.next_rule: PrescribeRule | None
 
     def set_next(self, rule: 'PrescribeRule') -> 'PrescribeRule':
         self.next_rule = rule
         return rule
 
-    def handle(self, patient: PatientData, symptoms: List[Symptom]) -> Optional[Prescription]:
+    def handle(self, patient: PatientData, symptoms: list[Symptom]) -> Prescription | None:
         result = self.diagnose(patient, symptoms)
         if result:
             return result
@@ -20,11 +21,11 @@ class PrescribeRule(ABC):
         return None
 
     @abstractmethod
-    def diagnose(self, patient: PatientData, symptoms: List[Symptom]) -> Optional[Prescription]:
+    def diagnose(self, patient: PatientData, symptoms: list[Symptom]) -> Prescription | None:
         pass
 
 class Covid19Rule(PrescribeRule):
-    def diagnose(self, patient: PatientData, symptoms: List[Symptom]) -> Optional[Prescription]:
+    def diagnose(self, patient: PatientData, symptoms: list[Symptom]) -> Prescription | None:
         # 打噴嚏、頭痛和咳嗽
         if Symptom.SNEEZE in symptoms and Symptom.HEADACHE in symptoms and Symptom.COUGH in symptoms:
             return Prescription(
@@ -36,7 +37,7 @@ class Covid19Rule(PrescribeRule):
         return None
 
 class AttractiveRule(PrescribeRule):
-    def diagnose(self, patient: PatientData, symptoms: List[Symptom]) -> Optional[Prescription]:
+    def diagnose(self, patient: PatientData, symptoms: list[Symptom]) -> Prescription | None:
         if patient.age == 18 and patient.gender == "female" and Symptom.SNEEZE in symptoms:
             return Prescription(
                 name="青春抑制劑",
@@ -47,7 +48,7 @@ class AttractiveRule(PrescribeRule):
         return None
 
 class SleepApneaRule(PrescribeRule):
-    def diagnose(self, patient: PatientData, symptoms: List[Symptom]) -> Optional[Prescription]:
+    def diagnose(self, patient: PatientData, symptoms: list[Symptom]) -> Prescription | None:
         bmi = patient.weight / ((patient.height / 100) ** 2)
         if bmi > 26 and Symptom.SNORE in symptoms:
             return Prescription(

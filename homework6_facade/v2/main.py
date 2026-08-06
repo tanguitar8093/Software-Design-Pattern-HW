@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(__file__))
 from facade import PrescriptionSystemFacade
 from models.enums import Symptom
 
+
 def main():
     # Setup paths
     base_dir = os.path.dirname(__file__)

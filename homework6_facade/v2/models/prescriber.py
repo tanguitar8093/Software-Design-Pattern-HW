@@ -1,18 +1,19 @@
-import time
-from typing import List
 import queue
 import threading
-from .enums import PotentialDisease, Symptom
+import time
+
 from .database import PatientDatabase
-from .rules import Covid19Rule, AttractiveRule, SleepApneaRule
 from .entities import Prescription
+from .enums import PotentialDisease, Symptom
 from .observers import IPrescriberObserver
+from .rules import AttractiveRule, Covid19Rule, SleepApneaRule
+
 
 class Prescriber:
     def __init__(self, db: PatientDatabase):
         self.db = db
-        self.supported_diseases: List[PotentialDisease] = []
-        self.observers: List[IPrescriberObserver] = []
+        self.supported_diseases: list[PotentialDisease] = []
+        self.observers: list[IPrescriberObserver] = []
         
         # Build rule chain
         self.rule_chain = Covid19Rule()
@@ -38,7 +39,7 @@ class Prescriber:
         if observer not in self.observers:
             self.observers.append(observer)
 
-    def notify_observers(self, patient_id: str, symptoms: List[Symptom], prescription: Prescription):
+    def notify_observers(self, patient_id: str, symptoms: list[Symptom], prescription: Prescription):
         for obs in self.observers:
             obs.update(patient_id, symptoms, prescription)
 
@@ -60,7 +61,7 @@ class Prescriber:
         with self.lock:
             self.is_diagnosing = False
 
-    def prescribe(self, patient_id: str, symptoms: List[Symptom]):
+    def prescribe(self, patient_id: str, symptoms: list[Symptom]):
         self.demand_queue.put((patient_id, symptoms))
         with self.lock:
             if not self.is_diagnosing:

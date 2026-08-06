@@ -1,10 +1,11 @@
 import json
-from typing import Dict
-from .entities import PatientData, PatientCase
+
+from .entities import PatientCase, PatientData
+
 
 class PatientDatabase:
     def __init__(self):
-        self.patients: Dict[str, PatientData] = {}
+        self.patients: dict[str, PatientData] = {}
 
     def import_data(self, json_path: str):
         with open(json_path, 'r', encoding='utf-8') as f:

@@ -1,11 +1,12 @@
-import pytest
-from unittest.mock import Mock, patch
 import json
-from models.enums import Symptom, PotentialDisease
-from models.entities import PatientData, Prescription
-from models.rules import Covid19Rule, AttractiveRule, SleepApneaRule
-from models.observers import IPrescriberObserver, JsonExportObserver, CsvExportObserver
+from unittest.mock import Mock, patch
+
+import pytest
 from facade import PrescriptionSystemFacade
+from models.entities import PatientData, Prescription
+from models.enums import PotentialDisease, Symptom
+from models.observers import CsvExportObserver, IPrescriberObserver, JsonExportObserver
+from models.rules import AttractiveRule, Covid19Rule, SleepApneaRule
 
 # ================= 1. 規則邏輯單元測試 (Unit Tests for Rules) =================
 
