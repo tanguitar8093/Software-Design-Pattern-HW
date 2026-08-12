@@ -33,7 +33,7 @@ classDiagram
         +List~PatientCase~ cases
         +add_case(case: PatientCase)
     }
-    
+
     class PatientCase {
         +DateTime case_time
         +List~Symptom~ symptoms
@@ -65,12 +65,12 @@ classDiagram
         +update(patient_id: String, symptoms: List~Symptom~, prescription: Prescription)
     }
     note for IPrescriberObserver "<br/><b>【Force-OCP 開放封閉原則】</b><br/>👉 <b>開放</b>：Client 能任意擴充收到結果時要觸發的外部行為 (如新增 CSV, DB)。<br/>👉 <b>封閉</b>：不必修改 Prescriber 內部核心程式。<br/><br/><b>【Force-BV 響應型】</b><br/>👉 當發生 diagnosis 完成事件後，自動觸發響應操作 (紀錄病歷/檔案匯出)。"
-    
+
     class CaseRecordObserver {
         -PatientDatabase db
         +update(patient_id: String, symptoms: List~Symptom~, prescription: Prescription)
     }
-    
+
     class JsonExportObserver {
         -String target_path
         +update(patient_id: String, symptoms: List~Symptom~, prescription: Prescription)
@@ -78,7 +78,7 @@ classDiagram
 
     IPrescriberObserver <|.. CaseRecordObserver
     IPrescriberObserver <|.. JsonExportObserver
-    CaseRecordObserver --> PatientDatabase : updates 
+    CaseRecordObserver --> PatientDatabase : updates
 
     %% ================= Chain of Responsibility Pattern (解決規則擴充) =================
     class PrescribeRule {
@@ -89,7 +89,7 @@ classDiagram
         #diagnose(patient: PatientData, symptoms: List~Symptom~) Prescription
     }
     note for PrescribeRule "<br/><b>【Force-OCP 開放封閉原則】</b><br/>👉 <b>開放</b>：未來會持續擴充全新疾病的診斷規則。<br/>👉 <b>封閉</b>：不必修改 Prescriber 診斷模組與既有 Rule。<br/><br/><b>【Force-BV 輸入比對型】</b><br/>👉 每一類對應的處理行為不同，依據打噴嚏、身高體重等特徵比對進行裁決。"
-    
+
     class Covid19Rule {
         #diagnose(patient: PatientData, symptoms: List~Symptom~) Prescription
     }
@@ -125,7 +125,7 @@ classDiagram
     class Client {
         +main()
     }
-    note for Client "<br/><b>【Force-易用性 (衝突發生點)】</b><br/>👉 <b>期望</b>：希望 Client 用 1~3 行即可執行一趟完整流程。<br/>👉 <b>現實</b>：沒有 Facade 模式時，Client 被迫要自己手動建立 DB、<br/>手動建立 Prescriber、手動建立並掛載所有 Observer。<br/>導致高度耦合且嚴重違反高內聚與易用性！"
+    note for Client "<br/><b>【Force-易用性 (衝突發生點)】</b><br/>👉 <b>期望</b>：希望 Client 用 1~3 行即可執行一趟完整流程。<br/>👉 <b>現實</b>：沒有 Facade 模式時，Client 被迫要自己手動建立 DB、<br/>手動建立 Prescriber、手動建立並掛載所有 Observer。<br/>導致高度耦合且嚴重違反高內聚與易用性！<br/><br/>👉 <b>高複雜度</b>：<br/>&nbsp;&nbsp;&nbsp;&nbsp;1. 診斷系統有許多類別 (PatientDatabase, Prescriber, Observer...)<br/>&nbsp;&nbsp;&nbsp;&nbsp;2. 類別間互有依賴且套用設計模式，若不理解的人會覺得錯綜複雜"
 
     Client --> PatientDatabase : 直接控制初始化
     Client --> Prescriber : 直接設定與呼叫診斷
