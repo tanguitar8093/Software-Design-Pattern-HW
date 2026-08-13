@@ -42,6 +42,18 @@
 ## IpAvailabilityRegistry
 
 - 職責：標記失效、判斷失效標記是否已恢復，提供下次 Request 要參考、要跳過的 IP
+- 定位：這不是套用某個 GoF 設計模式產生的角色，而是從 `ServiceDiscovery` 與 `LoadBalancing` 兩者「重疊需求」中分析出來的共用 Helper/協作者類別（單一職責分離的結果）。它不實作 `HttpClient` 介面、不參與 Decorator 鏈的包裝與傳遞，是站在 Decorator 結構外面、被多個 ConcreteDecorator 共同依賴的協作者。
+- 介面設計（決定採用方案 A）：
+  ```
+  + getValidIps(host: String): List<String>   // 依設定檔原始順序，回傳目前有效（未被標記失效）的 IP 清單
+  + markInvalid(ip: String)                    // 標記失效，10 分鐘後自動恢復（lazy check：查詢當下比對 invalidUntil 是否已過期，非背景排程）
+  ```
+- 卡點釐清：`IpAvailabilityRegistry` 只回答「這個 host 目前有效的 IP 有哪些」，**不負責「怎麼選」**：
+  - `ServiceDiscovery` 呼叫 `getValidIps(host)` 後，自己選清單中的**第一個**（`validIps[0]`）。
+  - `LoadBalancing` 呼叫 `getValidIps(host)` 後，用**自己私有的輪詢索引**（`Map<host, index>`，索引搭配 `% validIps.size()`）選出這次該輪到的 IP，索引本身不假手 `IpAvailabilityRegistry` 儲存。
+  - 理由：「選第一個」「輪流選」都是呼叫端各自的**選擇策略**，不是「IP 是否有效」這件事本身；若把選擇邏輯也塞進 `Registry`，會讓它變成什麼都做的上帝類別，且未來新增第三種選擇策略時還要回頭修改 `Registry`，違反開放封閉。
+  - 「輪詢索引」只有 `LoadBalancing` 自己需要、沒有其他角色關心，所以不需要比照 `IpAvailabilityRegistry` 拉成獨立的共用類別，直接當作 `LoadBalancingHttpClient` 的私有欄位即可（沒有「現在就有多個角色需要同一份事實」這種必然性，硬拆只是形式對稱、沒有實質架構價值）。
+- 標記失效的時機：發生在「實際送出 HTTP 請求之後、得知失敗」的當下（也就是最底層 `next.sendRequest(...)` 拋出例外時），不是在挑選 IP 的當下判定，`ServiceDiscovery`/`LoadBalancing` 在挑選時都只是「讀取」這份共用狀態來過濾候選。
 
 ---
 
@@ -155,13 +167,14 @@ classDiagram
         +sendRequest(request: HttpRequest)
     }
     class LoadBalancingHttpClient {
+        -cursorPerHost: Map~String, int~
         +sendRequest(request: HttpRequest)
     }
     class BlacklistHttpClient {
         +sendRequest(request: HttpRequest)
     }
     class IpAvailabilityRegistry {
-        +isValid(ip: String) boolean
+        +getValidIps(host: String) List~String~
         +markInvalid(ip: String)
     }
 
@@ -171,8 +184,8 @@ classDiagram
     HttpClientDecorator <|-- LoadBalancingHttpClient
     HttpClientDecorator <|-- BlacklistHttpClient
     HttpClientDecorator o--> HttpClient : next（被包裝的下一層）
-    ServiceDiscoveryHttpClient --> IpAvailabilityRegistry : 查詢/標記
-    LoadBalancingHttpClient --> IpAvailabilityRegistry : 查詢
+    ServiceDiscoveryHttpClient --> IpAvailabilityRegistry : 讀取有效清單/標記失效
+    LoadBalancingHttpClient --> IpAvailabilityRegistry : 讀取有效清單（輪詢索引為自己私有欄位，不放入 Registry）
 ```
 
 對照三個 Forces 分別怎麼被滿足：
@@ -180,3 +193,13 @@ classDiagram
 - **Force 1（組合爆炸）**：每個機制都只是一個實作 `HttpClient` 介面的 ConcreteDecorator，排列組合是在「組裝鏈的時候」用建構子疊起來決定（例如 `new ServiceDiscoveryHttpClient(new LoadBalancingHttpClient(new BlacklistHttpClient(new FakeHttpClient())))`），不需要為每一種組合寫一個新類別，類別數量只跟「機制種類數」成正比，不會隨組合數爆炸。
 - **Force 2（開放封閉）**：新增一個機制，只要新增一個新的 ConcreteDecorator（實作 `HttpClient` 介面即可），完全不用改到 `HttpClient` 介面、`FakeHttpClient`，或既有的其他 ConcreteDecorator；新增一個 `HttpClient` 的其他實作（取代 `FakeHttpClient`）也一樣，只要遵守 `HttpClient` 介面即可被既有 Decorator 包裝。
 - **Force 3（一致介面/透明組合）**：`HttpClientDecorator` 跟 `FakeHttpClient` 都實作同一個 `HttpClient` 介面，所以任何一個 ConcreteDecorator 的 `next` 欄位可以放「另一個 ConcreteDecorator」或「最終的 `FakeHttpClient`」，彼此互不知情、可以任意疊放順序，滿足「不管排列組合都用同一套邏輯運行」的要求。
+
+### `IpAvailabilityRegistry` 與各 ConcreteDecorator 的職責分工（方案 A）
+
+`IpAvailabilityRegistry` 不是 Decorator Pattern 結構中的角色（不實作 `HttpClient`、不參與包裝鏈），而是站在結構外面、被 `ServiceDiscoveryHttpClient` 與 `LoadBalancingHttpClient` 共同依賴注入的協作者，只負責「有效性事實」的讀寫，不負責「選擇策略」：
+
+- `ServiceDiscoveryHttpClient.sendRequest()`：呼叫 `registry.getValidIps(host)`，取清單第一項 `validIps[0]` 作為選中的 IP；呼叫 `next.sendRequest(...)` 失敗時，呼叫 `registry.markInvalid(ip)`。
+- `LoadBalancingHttpClient.sendRequest()`：呼叫 `registry.getValidIps(host)` 取得候選清單，再用自己私有的 `cursorPerHost: Map<host, index>` 依 `index % validIps.size()` 選出這次要用的 IP，並將索引遞增；游標**不**存在 `IpAvailabilityRegistry` 內，因為只有 `LoadBalancingHttpClient` 自己需要這份狀態。
+- `BlacklistHttpClient.sendRequest()`：不依賴 `IpAvailabilityRegistry`，只檢查請求網址中的 Host 是否命中黑名單清單，命中則拋例外中止、不呼叫 `next`（因此也不會觸發 `markInvalid`）。
+
+
