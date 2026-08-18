@@ -1,6 +1,7 @@
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List
 
+from .exceptions import HttpRequestFailedException
 from .http_client import HttpClient, HttpClientDecorator, HttpRequest
 from .ip_availability_registry import IpAvailabilityRegistry
 
@@ -15,9 +16,15 @@ class LoadBalancingHttpClient(HttpClientDecorator):
 
     def send_request(self, request: HttpRequest) -> None:
         valid_ips = self._registry.get_valid_ips(request.host)
-        if not valid_ips:
-            self._next.send_request(request)
-            return
+        target = self._select(request, valid_ips) if valid_ips else request
+        # 跟 ServiceDiscoveryHttpClient 對稱：誰選了 IP，誰就負責在失敗時標記失效
+        try:
+            self._next.send_request(target)
+        except HttpRequestFailedException:
+            self._registry.mark_invalid(target.host)
+            raise
+
+    def _select(self, request: HttpRequest, valid_ips: List[str]) -> HttpRequest:
         index = self._cursor_per_host[request.host] % len(valid_ips)
         self._cursor_per_host[request.host] += 1
-        self._next.send_request(request.with_host(valid_ips[index]))
+        return request.with_host(valid_ips[index])

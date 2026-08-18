@@ -1,5 +1,8 @@
 from unittest.mock import Mock
 
+import pytest
+
+from models.exceptions import HttpRequestFailedException
 from models.http_client import HttpRequest
 from models.ip_availability_registry import IpAvailabilityRegistry
 from models.load_balancing_http_client import LoadBalancingHttpClient
@@ -52,3 +55,29 @@ def test_forwards_original_request_when_no_valid_ip():
     client.send_request(HttpRequest("http://unknown.tw/mail"))
 
     assert next_client.send_request.call_args[0][0].url == "http://unknown.tw/mail"
+
+
+def test_marks_selected_ip_invalid_and_reraises_when_forwarded_request_fails():
+    registry = IpAvailabilityRegistry({"waterballsa.tw": ["35.0.0.1", "35.0.0.2"]})
+    next_client = Mock()
+    next_client.send_request.side_effect = HttpRequestFailedException("http://35.0.0.1/mail")
+    client = LoadBalancingHttpClient(next_client, registry)
+
+    with pytest.raises(HttpRequestFailedException):
+        client.send_request(HttpRequest("http://waterballsa.tw/mail"))
+
+    assert registry.get_valid_ips("waterballsa.tw") == ["35.0.0.2"]
+
+
+def test_next_valid_ip_is_chosen_after_previous_pick_is_marked_invalid():
+    registry = IpAvailabilityRegistry({"waterballsa.tw": ["35.0.0.1", "35.0.0.2"]})
+    next_client = Mock()
+    next_client.send_request.side_effect = [HttpRequestFailedException("http://35.0.0.1/mail"), None]
+    client = LoadBalancingHttpClient(next_client, registry)
+
+    with pytest.raises(HttpRequestFailedException):
+        client.send_request(HttpRequest("http://waterballsa.tw/mail"))
+
+    client.send_request(HttpRequest("http://waterballsa.tw/mail"))
+
+    assert next_client.send_request.call_args[0][0].host == "35.0.0.2"
