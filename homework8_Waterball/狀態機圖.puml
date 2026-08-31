@@ -1,0 +1,81 @@
+@startuml
+left to right direction
+hide empty description
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 16
+skinparam dpi 180
+skinparam nodesep 120
+skinparam ranksep 180
+skinparam padding 25
+skinparam backgroundColor #101820
+skinparam defaultFontName "Noto Sans CJK TC"
+skinparam defaultFontColor #F5F7FA
+skinparam ArrowColor #F5F7FA
+skinparam ArrowFontColor #F5F7FA
+skinparam ArrowThickness 2
+skinparam State {
+    BackgroundColor #087EAF
+    BorderColor #F5F7FA
+    FontColor #F5F7FA
+    FontSize 18
+    StartColor #F5F7FA
+    EndColor #F5F7FA
+}
+
+[*] --> DefaultConversation : started\n[onlineCount < 10]
+[*] --> Interacting : started\n[onlineCount >= 10]
+
+state "Default Conversation" as DefaultConversation
+state "Interacting" as Interacting
+state "Waiting" as Waiting
+state "Recording" as Recording
+state "Questioning" as Questioning
+state "Thanks For Joining" as ThanksForJoining
+
+DefaultConversation : entry / resetReplyCycle(good to hear)
+DefaultConversation : new message / replyCycle(good to hear, thank you, How are you)
+DefaultConversation : new post / comment(Nice post, author)
+
+Interacting : entry / resetReplyCycle(Hi hi😁)
+Interacting : new message / replyCycle(Hi hi😁, I like your idea!)
+Interacting : new post / comment(How do you guys think about it?, bot -> loginOrder)
+
+Waiting : entry / recorder retained
+Recording : speak / record(voiceMessage)
+ThanksForJoining : entry / announceResult(broadcast if no speaker, otherwise chat)
+
+DefaultConversation --> Interacting : login\n[onlineCount >= 10]
+Interacting --> DefaultConversation : logout\n[onlineCount < 10]
+
+DefaultConversation --> Waiting : record @bot\n[quota >= 3 and no speaker]\n/ reply + decreaseQuota(3) + setRecorder(author)
+DefaultConversation --> Recording : record @bot\n[quota >= 3 and speaker exists]\n/ reply + decreaseQuota(3) + setRecorder(author)
+Interacting --> Waiting : record @bot\n[quota >= 3 and no speaker]\n/ reply + decreaseQuota(3) + setRecorder(author)
+Interacting --> Recording : record @bot\n[quota >= 3 and speaker exists]\n/ reply + decreaseQuota(3) + setRecorder(author)
+
+Waiting --> Recording : go broadcasting
+Recording --> Waiting : stop broadcasting\n/ sendRecordReplay(recorder)
+
+Waiting --> DefaultConversation : stop-recording @bot\n[author == recorder and onlineCount < 10]
+Waiting --> Interacting : stop-recording @bot\n[author == recorder and onlineCount >= 10]
+Recording --> DefaultConversation : stop-recording @bot\n[author == recorder and onlineCount < 10]\n/ sendRecordReplay(recorder)
+Recording --> Interacting : stop-recording @bot\n[author == recorder and onlineCount >= 10]\n/ sendRecordReplay(recorder)
+
+DefaultConversation --> Questioning : king @bot\n[author.isAdmin and quota >= 5]\n/ reply + decreaseQuota(5) + start + ask(Q0)
+Interacting --> Questioning : king @bot\n[author.isAdmin and quota >= 5]\n/ reply + decreaseQuota(5) + start + ask(Q0)
+
+Questioning --> Questioning : correct answer @bot\n[firstCorrect and question remains]\n/ score(author) + ask(nextQuestion)
+Questioning --> ThanksForJoining : correct answer @bot\n[firstCorrect and allQuestionsDone]\n/ score(author)
+Questioning --> ThanksForJoining : 1 hour elapsed
+
+Questioning --> Questioning : play again @bot\n[quota >= 5]\n/ decreaseQuota(5) + startAgain + ask(Q0)
+ThanksForJoining --> Questioning : play again @bot\n[quota >= 5]\n/ decreaseQuota(5) + startAgain + ask(Q0)
+
+Questioning --> DefaultConversation : king-stop @bot\n[author.isAdmin and onlineCount < 10]
+Questioning --> Interacting : king-stop @bot\n[author.isAdmin and onlineCount >= 10]
+ThanksForJoining --> DefaultConversation : king-stop @bot\n[author.isAdmin and onlineCount < 10]
+ThanksForJoining --> Interacting : king-stop @bot\n[author.isAdmin and onlineCount >= 10]
+
+ThanksForJoining --> DefaultConversation : 20 seconds elapsed\n[onlineCount < 10]
+ThanksForJoining --> Interacting : 20 seconds elapsed\n[onlineCount >= 10]
+@enduml

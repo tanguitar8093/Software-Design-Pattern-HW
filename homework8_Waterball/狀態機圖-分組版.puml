@@ -1,0 +1,81 @@
+@startuml
+left to right direction
+hide empty description
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam dpi 180
+skinparam nodesep 85
+skinparam ranksep 110
+skinparam padding 18
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Noto Sans CJK TC"
+skinparam defaultFontColor #333333
+skinparam ArrowColor #666666
+skinparam ArrowFontColor #333333
+skinparam ArrowThickness 1
+skinparam State {
+    BackgroundColor #F7F4FF
+    BorderColor #A98CFF
+    FontColor #333333
+    FontSize 16
+    StartColor #333333
+    EndColor #333333
+}
+
+state "Normal" as Normal {
+    state "Default Conversation" as DefaultConversation
+    state "Interacting" as Interacting
+
+    [*] --> DefaultConversation : [onlineCount < 10]
+    [*] --> Interacting : [onlineCount >= 10]
+
+    DefaultConversation : new message / replyCycle(...)
+    DefaultConversation : new post / comment(Nice post, author)
+    Interacting : new message / replyCycle(...)
+    Interacting : new post / comment(allOnlineMembers)
+
+    DefaultConversation --> Interacting : login\n[onlineCount >= 10]
+    Interacting --> DefaultConversation : logout\n[onlineCount < 10]
+}
+
+state "Record" as Record {
+    state "Waiting" as Waiting
+    state "Recording" as Recording
+
+    [*] --> Waiting : [no speaker]
+    [*] --> Recording : [speaker exists]
+
+    Waiting : entry / recorder retained
+    Recording : speak / record(voiceMessage)
+
+    Waiting --> Recording : go broadcasting
+    Recording --> Waiting : stop broadcasting\n/ sendRecordReplay(recorder)
+}
+
+state "KnowledgeKing" as KnowledgeKing {
+    state "Questioning" as Questioning
+    state "Thanks For Joining" as ThanksForJoining
+
+    [*] --> Questioning : entry / started + ask(Q0)
+    Questioning : answer @bot\n[first correct] / score(author)
+    ThanksForJoining : entry / announceResult(...)
+
+    Questioning --> Questioning : correct answer @bot\n[question remains] / ask(nextQuestion)
+    Questioning --> ThanksForJoining : correct answer @bot\n[all questions done]
+    Questioning --> ThanksForJoining : 1 hour elapsed
+    ThanksForJoining --> Questioning : play again @bot\n[quota >= 5] / decreaseQuota(5) + ask(Q0)
+}
+
+[*] --> Normal
+
+Normal --> Record : record @bot\n[quota >= 3]\n/ reply + decreaseQuota(3) + setRecorder(author)
+Normal --> KnowledgeKing : king @bot\n[Admin and quota >= 5]\n/ reply + decreaseQuota(5)
+
+Record --> Normal : stop-recording @bot\n[author == recorder]\n/ sendRecordReplayIfAny(recorder)
+KnowledgeKing --> Normal : king-stop @bot [Admin]
+KnowledgeKing --> Normal : 20 seconds elapsed\n[ThanksForJoining]
+
+Normal -[hidden]-> Record
+Record -[hidden]-> KnowledgeKing
+@enduml

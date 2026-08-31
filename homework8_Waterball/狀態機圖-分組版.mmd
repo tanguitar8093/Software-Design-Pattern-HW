@@ -1,0 +1,55 @@
+stateDiagram-v2
+    direction LR
+
+    [*] --> Normal
+
+    state "Normal" as Normal {
+        [*] --> DefaultConversation: [onlineCount < 10]
+        [*] --> Interacting: [onlineCount >= 10]
+
+        state "Default Conversation" as DefaultConversation
+        state "Interacting" as Interacting
+
+        DefaultConversation: new message / replyCycle(...)
+        DefaultConversation: new post / comment(Nice post, author)
+        Interacting: new message / replyCycle(...)
+        Interacting: new post / comment(allOnlineMembers)
+
+        DefaultConversation --> Interacting: login [onlineCount >= 10]
+        Interacting --> DefaultConversation: logout [onlineCount < 10]
+    }
+
+    state "Record" as Record {
+        [*] --> Waiting: [no speaker]
+        [*] --> Recording: [speaker exists]
+
+        state "Waiting" as Waiting
+        state "Recording" as Recording
+
+        Waiting: entry / recorder retained
+        Recording: speak / record(voiceMessage)
+
+        Waiting --> Recording: go broadcasting
+        Recording --> Waiting: stop broadcasting / sendRecordReplay(recorder)
+    }
+
+    state "KnowledgeKing" as KnowledgeKing {
+        [*] --> Questioning: entry / started + ask(Q0)
+
+        state "Questioning" as Questioning
+        state "Thanks For Joining" as ThanksForJoining
+
+        Questioning: answer @bot [first correct] / score(author)
+        ThanksForJoining: entry / announceResult(...)
+
+        Questioning --> Questioning: correct answer [question remains] / ask(nextQuestion)
+        Questioning --> ThanksForJoining: correct answer [all questions done]
+        Questioning --> ThanksForJoining: 1 hour elapsed
+        ThanksForJoining --> Questioning: play again @bot [quota >= 5] / decreaseQuota(5) + ask(Q0)
+    }
+
+    Normal --> Record: record @bot [quota >= 3] / reply + decreaseQuota(3) + setRecorder(author)
+    Normal --> KnowledgeKing: king @bot [Admin and quota >= 5] / reply + decreaseQuota(5)
+    Record --> Normal: stop-recording @bot [author == recorder] / sendRecordReplayIfAny(recorder)
+    KnowledgeKing --> Normal: king-stop @bot [Admin]
+    KnowledgeKing --> Normal: 20 seconds elapsed [ThanksForJoining]

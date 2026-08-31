@@ -1,53 +1,59 @@
 stateDiagram-v2
     direction LR
 
-    [*] --> Normal
+    [*] --> DefaultConversation: started [onlineCount < 10]
+    [*] --> Interacting: started [onlineCount >= 10]
 
-    state "Normal" as Normal {
-        [*] --> DefaultConversation: [onlineCount < 10]
-        [*] --> Interacting: [onlineCount >= 10]
+    state "Default Conversation" as DefaultConversation
+    state "Interacting" as Interacting
+    state "Waiting" as Waiting
+    state "Recording" as Recording
+    state "Questioning" as Questioning
+    state "Thanks For Joining" as ThanksForJoining
 
-        state "Default Conversation" as DefaultConversation
-        state "Interacting" as Interacting
+    DefaultConversation: entry / resetReplyCycle(good to hear)
+    DefaultConversation: new message / replyCycle(good to hear, thank you, How are you)
+    DefaultConversation: new post / comment(Nice post, author)
 
-        DefaultConversation: new message / replyCycle(good to hear, thank you, How are you)
-        DefaultConversation: new post / comment(Nice post, author)
-        DefaultConversation --> Interacting: login [onlineCount >= 10]
+    Interacting: entry / resetReplyCycle(Hi hi😁)
+    Interacting: new message / replyCycle(Hi hi😁, I like your idea!)
+    Interacting: new post / comment(How do you guys think about it?, bot -> loginOrder)
 
-        Interacting: new message / replyCycle(Hi hi😁, I like your idea!)
-        Interacting: new post / comment(allOnlineMembers: bot -> loginOrder)
-        Interacting --> DefaultConversation: logout [onlineCount < 10]
-    }
+    Waiting: entry / recorder retained
+    Recording: speak / record(voiceMessage)
 
-    Normal --> Record: new message: record @bot [quota >= 3] / quota -= 3; recorder = author
-    Normal --> KnowledgeKing: new message: king @bot [author.isAdmin && quota >= 5] / quota -= 5
+    ThanksForJoining: entry / announceResult(broadcast if no speaker, otherwise chat)
 
-    state "Record" as Record {
-        [*] --> Waiting: [no speaker]
-        [*] --> Recording: [speaker exists]
+    DefaultConversation --> Interacting: login [onlineCount >= 10]
+    Interacting --> DefaultConversation: logout [onlineCount < 10]
 
-        state "Waiting" as Waiting
-        state "Recording" as Recording
+    DefaultConversation --> Waiting: record @bot [quota >= 3 && no speaker] / reply + decreaseQuota(3) + setRecorder(author)
+    DefaultConversation --> Recording: record @bot [quota >= 3 && speaker exists] / reply + decreaseQuota(3) + setRecorder(author)
+    Interacting --> Waiting: record @bot [quota >= 3 && no speaker] / reply + decreaseQuota(3) + setRecorder(author)
+    Interacting --> Recording: record @bot [quota >= 3 && speaker exists] / reply + decreaseQuota(3) + setRecorder(author)
 
-        Waiting --> Recording: go broadcasting
-        Recording: speak / record(voiceMessage)
-        Recording --> Waiting: stop broadcasting / sendRecordReplay(recorder)
-    }
+    Waiting --> Recording: go broadcasting
+    Recording --> Waiting: stop broadcasting / sendRecordReplay(recorder)
 
-    Record --> Normal: new message: stop-recording @bot [author == recorder] / sendRecordReplayIfAny(recorder)
+    Waiting --> DefaultConversation: stop-recording @bot [author == recorder && onlineCount < 10]
+    Waiting --> Interacting: stop-recording @bot [author == recorder && onlineCount >= 10]
+    Recording --> DefaultConversation: stop-recording @bot [author == recorder && onlineCount < 10] / sendRecordReplay(recorder)
+    Recording --> Interacting: stop-recording @bot [author == recorder && onlineCount >= 10] / sendRecordReplay(recorder)
 
-    state "KnowledgeKing" as KnowledgeKing {
-        [*] --> Questioning: entry / KnowledgeKing is started; ask(Question 0)
+    DefaultConversation --> Questioning: king @bot [author.isAdmin && quota >= 5] / reply + decreaseQuota(5) + start + ask(Q0)
+    Interacting --> Questioning: king @bot [author.isAdmin && quota >= 5] / reply + decreaseQuota(5) + start + ask(Q0)
 
-        state "Questioning" as Questioning
-        state "Thanks For Joining" as ThanksForJoining
+    Questioning --> Questioning: correct answer @bot [firstCorrect && question remains] / score(author) + ask(nextQuestion)
+    Questioning --> ThanksForJoining: correct answer @bot [firstCorrect && allQuestionsDone] / score(author)
+    Questioning --> ThanksForJoining: 1 hour elapsed
 
-        Questioning --> Questioning: answer @bot [firstCorrectAnswer && question remains] / addScore(author); ask(nextQuestion)
-        Questioning --> ThanksForJoining: answer @bot [firstCorrectAnswer && allQuestionsDone] / addScore(author)
-        Questioning --> ThanksForJoining: 1 hour elapsed
-        ThanksForJoining: entry / announceResult(broadcast if no speaker; otherwise chat)
-    }
+    Questioning --> Questioning: play again @bot [quota >= 5] / decreaseQuota(5) + startAgain + ask(Q0)
+    ThanksForJoining --> Questioning: play again @bot [quota >= 5] / decreaseQuota(5) + startAgain + ask(Q0)
 
-    KnowledgeKing --> Normal: new message: king-stop @bot [author.isAdmin]
-    KnowledgeKing --> KnowledgeKing: new message: play again @bot [quota >= 5] / quota -= 5; Questioning
-    KnowledgeKing --> Normal: 20 seconds elapsed [ThanksForJoining]
+    Questioning --> DefaultConversation: king-stop @bot [author.isAdmin && onlineCount < 10]
+    Questioning --> Interacting: king-stop @bot [author.isAdmin && onlineCount >= 10]
+    ThanksForJoining --> DefaultConversation: king-stop @bot [author.isAdmin && onlineCount < 10]
+    ThanksForJoining --> Interacting: king-stop @bot [author.isAdmin && onlineCount >= 10]
+
+    ThanksForJoining --> DefaultConversation: 20 seconds elapsed [onlineCount < 10]
+    ThanksForJoining --> Interacting: 20 seconds elapsed [onlineCount >= 10]
