@@ -1,0 +1,123 @@
+classDiagram
+    direction LR
+
+    class WaterballCommunity {
+        +botId: String = "bot"
+        +login(member: Member) void
+        +logout(memberId: String) void
+        +elapse(timeUnit: String, amount: Integer) void
+    }
+
+    class Participant {
+        +id: String
+        +online: Boolean
+        +login() void
+        +logout() void
+    }
+
+    class Member {
+        +id: String
+        +role: Role
+        +sendMessage(content: String, tags: Tag[]) Message
+        +publishPost(title: String, content: String, tags: Tag[]) Post
+        +writeComment(post: Post, content: String, tags: Tag[]) Comment
+        +startBroadcast() void
+        +speak(content: String) VoiceMessage
+        +stopBroadcast() void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: Integer
+        +currentTime: DateTime
+        +receive(event: CommunityEvent) void
+        +sendMessage(content: String, tags: Tag[]) Message
+        +comment(post: Post, content: String, tags: Tag[]) Comment
+        +startBroadcast() void
+        +speak(content: String) VoiceMessage
+        +stopBroadcast() void
+    }
+
+    class ChatRoom {
+        +addMessage(message: Message) void
+    }
+
+    class Forum {
+        +addPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+    }
+
+    class Broadcast {
+        +speakerId: String
+        +start(speaker: Participant) void
+        +addVoiceMessage(message: VoiceMessage) void
+        +stop(speakerId: String) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +addTag(tag: Tag) void
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +addTag(tag: Tag) void
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +addTag(tag: Tag) void
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class Tag {
+        +memberId: String
+    }
+
+    class CommunityEvent {
+        <<abstract>>
+    }
+
+    WaterballCommunity "1" *-- "1" ChatRoom
+    WaterballCommunity "1" *-- "1" Forum
+    WaterballCommunity "1" *-- "1" Broadcast
+    WaterballCommunity "1" o-- "0..*" Participant : online participants
+
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+    Member "1" --> "0..*" Message : sends
+    Member "1" --> "0..*" Post : publishes
+    Member "1" --> "0..*" Comment : writes
+    Member "1" --> "0..*" VoiceMessage : speaks
+
+    ChatRoom "1" o-- "0..*" Message
+    Forum "1" o-- "0..*" Post
+    Post "1" o-- "0..*" Comment
+    Broadcast "1" o-- "0..*" VoiceMessage
+
+    Message "1" o-- "0..*" Tag
+    Post "1" o-- "0..*" Tag
+    Comment "1" o-- "0..*" Tag
+    Tag --> Participant : mentions
+
+    Bot --> ChatRoom : reads / sends
+    Bot --> Forum : reads / comments
+    Bot --> Broadcast : reads / broadcasts
+    Bot ..> CommunityEvent : receives

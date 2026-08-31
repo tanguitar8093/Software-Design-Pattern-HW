@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor Admin as 管理員
+    participant ChatRoom as 聊天室
+    participant Bot as 社群機器人
+
+    Admin->>ChatRoom: addMessage(Message("king", [@bot]))
+    ChatRoom->>Bot: receive(NewMessage)
+
+    Note over Bot: 目前：Normal / Default Conversation 或 Interacting
+    Bot->>Bot: 處理目前狀態的聊天訊息
+    alt Default Conversation
+        Bot->>ChatRoom: addMessage(輪播回覆, [@管理員])
+    else Interacting
+        Bot->>ChatRoom: addMessage(輪播回覆, [@管理員])
+    end
+
+    Bot->>Bot: 驗證 @bot、Admin、quota >= 5
+    alt 指令有效
+        Bot->>Bot: quota -= 5
+        Bot->>Bot: 進入 KnowledgeKing / Questioning
+        Bot->>ChatRoom: addMessage("KnowledgeKing is started!", [])
+        Bot->>ChatRoom: addMessage(第 0 題, [])
+    else 指令無效
+        Note over Bot: 靜默失敗；僅保留目前狀態的聊天回應
+    end
