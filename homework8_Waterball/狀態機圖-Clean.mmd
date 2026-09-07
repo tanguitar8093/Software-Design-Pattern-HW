@@ -1,0 +1,72 @@
+stateDiagram-v2
+    direction LR
+
+    [*] --> Normal
+
+    %% ==========================================
+    %% 1. 正常狀態 (Normal)
+    %% ==========================================
+    state Normal {
+        [*] --> DefaultConversation : [onlineCount < 10]
+        [*] --> Interacting : [onlineCount >= 10]
+
+        DefaultConversation : <b>Default Conversation</b>
+        DefaultConversation : entry / resetCycle("good to hear")
+        DefaultConversation : new message / replyCycle(3則輪播)
+        DefaultConversation : new post / comment("Nice post")
+
+        Interacting : <b>Interacting</b>
+        Interacting : entry / resetCycle("Hi hi😁")
+        Interacting : new message / replyCycle(2則輪播)
+        Interacting : new post / comment("How do you guys think...?", @all)
+
+        DefaultConversation --> Interacting : login [onlineCount >= 10]
+        Interacting --> DefaultConversation : logout [onlineCount < 10]
+    }
+
+    %% ==========================================
+    %% 2. 錄音狀態 (Record)
+    %% ==========================================
+    state Record {
+        [*] --> Waiting : [無人廣播]
+        [*] --> Recording : [有人廣播中]
+
+        Waiting : <b>Waiting</b>
+        Waiting : 等待成員開始廣播
+
+        Recording : <b>Recording</b>
+        Recording : speak / addVoice(content)
+
+        Waiting --> Recording : go broadcasting
+        Recording --> Waiting : stop broadcasting / sendReplay(@recorder)
+    }
+
+    %% ==========================================
+    %% 3. 知識王狀態 (KnowledgeKing)
+    %% ==========================================
+    state KnowledgeKing {
+        [*] --> Questioning : entry / send("started!") + ask(Q0)
+
+        Questioning : <b>Questioning</b>
+        Questioning : 正確答案@bot [首位] / score+1, send("Congrats!")
+
+        ThanksForJoining : <b>ThanksForJoining</b>
+        ThanksForJoining : entry / announceWinner(無廣播則語音, 否則文字)
+
+        Questioning --> Questioning : 正確答案@bot [尚有題目] / ask(下一題)
+        Questioning --> ThanksForJoining : 正確答案@bot [全答完]
+        Questioning --> ThanksForJoining : 1 hour elapsed
+
+        ThanksForJoining --> Questioning : play again @bot [quota >= 5] / quota-5 + ask(Q0)
+    }
+
+    %% ==========================================
+    %% 主狀態切換 (Transitions between Main States)
+    %% ==========================================
+    Normal --> Record : record @bot [quota >= 3]<br/>/ 輪播回覆 + quota-3 + 記下recorder
+    Normal --> KnowledgeKing : king @bot [Admin && quota >= 5]<br/>/ 輪播回覆 + quota-5
+
+    Record --> Normal : stop-recording @bot [author == recorder]<br/>/ 若錄音中先發Replay, 結束錄音
+
+    KnowledgeKing --> Normal : king-stop @bot [Admin]
+    KnowledgeKing --> Normal : 20 seconds elapsed [於ThanksForJoining]

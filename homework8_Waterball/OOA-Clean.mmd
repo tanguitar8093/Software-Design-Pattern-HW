@@ -24,7 +24,7 @@ classDiagram
         +speak(broadcast: Broadcast, content: String) void
         +stopBroadcast(broadcast: Broadcast) void
     }
-
+Astah 
     class Role {
         <<enumeration>>
         ADMIN
@@ -124,7 +124,7 @@ classDiagram
     WaterballCommunity "1" *-- "1" ChatRoom : 擁有
     WaterballCommunity "1" *-- "1" Forum : 擁有
     WaterballCommunity "1" *-- "1" Broadcast : 擁有
-    WaterballCommunity "1" *-- "1" Bot : 駐駐
+    WaterballCommunity "1" *-- "1" Bot : 常駐
     WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
 
     %% 訊息與內容關聯

@@ -1,0 +1,86 @@
+stateDiagram-v2
+    direction TB
+
+    [*] --> DefaultConversation : [onlineCount < 10]
+    [*] --> Interacting : [onlineCount >= 10]
+
+    %% ==========================================
+    %% 狀態定義 (6個扁平狀態)
+    %% ==========================================
+    DefaultConversation : <b>Default Conversation</b>
+    DefaultConversation : entry / resetCycle("good to hear")
+    DefaultConversation : new message / replyCycle(3則輪播)
+    DefaultConversation : new post / comment("Nice post")
+
+    Interacting : <b>Interacting</b>
+    Interacting : entry / resetCycle("Hi hi😁")
+    Interacting : new message / replyCycle(2則輪播)
+    Interacting : new post / comment("How do you guys think...?", @all)
+
+    Waiting : <b>Waiting</b>
+    Waiting : 等待成員開始廣播
+
+    Recording : <b>Recording</b>
+    Recording : speak / addVoice(content)
+
+    Questioning : <b>Questioning</b>
+    Questioning : 正確答案@bot [首位] / score+1, send("Congrats!")
+
+    ThanksForJoining : <b>ThanksForJoining</b>
+    ThanksForJoining : entry / announceWinner(無廣播則語音, 否則文字)
+
+    %% ==========================================
+    %% 正常狀態間切換 (在線人數條件)
+    %% ==========================================
+    DefaultConversation --> Interacting : login [onlineCount >= 10]
+    Interacting --> DefaultConversation : logout [onlineCount < 10]
+
+    %% ==========================================
+    %% 進入錄音 (從 DefaultConversation / Interacting)
+    %% ==========================================
+    DefaultConversation --> Waiting : record @bot [quota >= 3 && !isBroadcasting]<br/>/ 輪播回覆 + quota-3 + 記下recorder
+    DefaultConversation --> Recording : record @bot [quota >= 3 && isBroadcasting]<br/>/ 輪播回覆 + quota-3 + 記下recorder
+    Interacting --> Waiting : record @bot [quota >= 3 && !isBroadcasting]<br/>/ 輪播回覆 + quota-3 + 記下recorder
+    Interacting --> Recording : record @bot [quota >= 3 && isBroadcasting]<br/>/ 輪播回覆 + quota-3 + 記下recorder
+
+    %% ==========================================
+    %% 錄音內部轉移
+    %% ==========================================
+    Waiting --> Recording : go broadcasting
+    Recording --> Waiting : stop broadcasting / sendReplay(@recorder)
+
+    %% ==========================================
+    %% 結束錄音 (stop-recording)
+    %% ==========================================
+    Waiting --> DefaultConversation : stop-recording @bot [author == recorder && onlineCount < 10]
+    Waiting --> Interacting : stop-recording @bot [author == recorder && onlineCount >= 10]
+
+    Recording --> DefaultConversation : stop-recording @bot [author == recorder && onlineCount < 10]<br/>/ sendReplay(@recorder)
+    Recording --> Interacting : stop-recording @bot [author == recorder && onlineCount >= 10]<br/>/ sendReplay(@recorder)
+
+    %% ==========================================
+    %% 進入知識王 (從 DefaultConversation / Interacting)
+    %% ==========================================
+    DefaultConversation --> Questioning : king @bot [Admin && quota >= 5]<br/>/ 輪播回覆 + quota-5 + send("started!") + ask(Q0)
+    Interacting --> Questioning : king @bot [Admin && quota >= 5]<br/>/ 輪播回覆 + quota-5 + send("started!") + ask(Q0)
+
+    %% ==========================================
+    %% 知識王答題與結算
+    %% ==========================================
+    Questioning --> Questioning : 正確答案@bot [尚有題目] / ask(下一題)
+    Questioning --> ThanksForJoining : 正確答案@bot [全答完]
+    Questioning --> ThanksForJoining : 1 hour elapsed
+
+    ThanksForJoining --> Questioning : play again @bot [quota >= 5]<br/>/ quota-5 + send("start again!") + ask(Q0)
+
+    %% ==========================================
+    %% 退出知識王 (king-stop 或 20秒結束)
+    %% ==========================================
+    Questioning --> DefaultConversation : king-stop @bot [Admin && onlineCount < 10]
+    Questioning --> Interacting : king-stop @bot [Admin && onlineCount >= 10]
+
+    ThanksForJoining --> DefaultConversation : king-stop @bot [Admin && onlineCount < 10]
+    ThanksForJoining --> Interacting : king-stop @bot [Admin && onlineCount >= 10]
+
+    ThanksForJoining --> DefaultConversation : 20 seconds elapsed [onlineCount < 10]
+    ThanksForJoining --> Interacting : 20 seconds elapsed [onlineCount >= 10]
