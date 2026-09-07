@@ -1,0 +1,152 @@
+classDiagram
+    direction TB
+
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+    }
+
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: int
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStarted(speakerId: String) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        +getMessages() List~Message~
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        +getPost(id: String) Post
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+        +getComments() List~Comment~
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    %% 繼承關係
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+
+    %% 社群整體聚合
+    WaterballCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterballCommunity "1" *-- "1" Forum : 擁有
+    WaterballCommunity "1" *-- "1" Broadcast : 擁有
+    WaterballCommunity "1" *-- "1" Bot : 駐駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
+
+    %% 訊息與內容關聯
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+
+    %% 機器人對社群組件與活動的掌握
+    Bot --> ChatRoom : 監聽並回覆訊息
+    Bot --> Forum : 監聽並發表留言
+    Bot --> Broadcast : 監聽語音或廣播發言
+    Bot "1" o-- "0..1" RecordingSession : 進行錄音會話
+    Bot "1" o-- "0..1" KnowledgeKingGame : 主持知識王遊戲
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+
+    %% 互動行為便條紙 (誰為了做甚麼事操作了誰的方法)
+    note for Member "【Member 互動行為】<br/>1. 交流/下指令：呼叫 ChatRoom.postMessage(Message)<br/>2. 論壇發布/回文：呼叫 Forum.createPost(Post)、Forum.addComment(postId, Comment)<br/>3. 語音廣播：呼叫 Broadcast.start(id)、Broadcast.speak(VoiceMessage)、Broadcast.stop(id)"
+
+    note for Bot "【Bot 互動行為】<br/>1. 回覆聊天/指令：收到 Message 後若為指令扣除 quota 並啟動遊戲/錄音；若為日常則呼叫 ChatRoom.postMessage() 依在線人數輪播回覆<br/>2. 回覆貼文：收到 Post 後呼叫 Forum.addComment() 留言並標記在線成員<br/>3. 錄音處理：廣播有 Speak 時呼叫 RecordingSession.addVoice()；講者 stop 或錄音者指令時呼叫 ChatRoom.postMessage() 輸出 Replay<br/>4. 遊戲主持：知識王結束時若 Broadcast.isBroadcasting() 為 false 則呼叫 Broadcast 語音公布結果，否則呼叫 ChatRoom.postMessage()"
+
+    note for KnowledgeKingGame "【KnowledgeKingGame 互動行為】<br/>1. 答題評分：Bot 收到 @bot 答案後呼叫 submitAnswer(memberId, ans)，內部比對 Question.isCorrect()，答對為該成員累加 1 分<br/>2. 判斷獲勝：Bot 於 3 題答完或 1 小時超時後呼叫 getWinner() 依分數結算贏家或 Tie"
+
+    note for RecordingSession "【RecordingSession 互動行為】<br/>1. 累積語音：Bot 在講者說話時操作 addVoice(VoiceMessage) 逐筆記錄<br/>2. 產出內容：結束錄音時 Bot 呼叫 generateReplay() 取得整合文字格式發送到聊天室"

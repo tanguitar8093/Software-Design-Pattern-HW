@@ -1,0 +1,225 @@
+classDiagram
+    direction LR
+
+    %% Domain classes
+    class WaterballCommunity {
+        +botId: String = "bot"
+        +login(member: Member) void
+        +logout(memberId: String) void
+        +elapse(timeUnit: String, amount: Integer) void
+        +notifyBot(event: CommunityEvent) void
+    }
+
+    class Participant {
+        +id: String
+        +online: Boolean
+        +login() void
+        +logout() void
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(content: String, tags: Tag[]) Message
+        +publishPost(title: String, content: String, tags: Tag[]) Post
+        +startBroadcast() void
+        +speak(content: String) VoiceMessage
+        +stopBroadcast() void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: Integer
+        +currentTime: DateTime
+        +receive(event: CommunityEvent) void
+        +sendMessage(content: String, tags: Tag[]) Message
+        +comment(post: Post, content: String, tags: Tag[]) Comment
+        +startBroadcast() void
+        +speak(content: String) VoiceMessage
+        +stopBroadcast() void
+    }
+
+    class ChatRoom {
+        +addMessage(message: Message) void
+    }
+
+    class Forum {
+        +addPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+    }
+
+    class Broadcast {
+        +speakerId: String
+        +start(speaker: Participant) void
+        +addVoiceMessage(message: VoiceMessage) void
+        +stop(speakerId: String) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+    }
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+    }
+    class Comment {
+        +authorId: String
+        +content: String
+    }
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+    class Tag {
+        +memberId: String
+    }
+    class CommunityEvent {
+        <<abstract>>
+    }
+
+    %% FN sticky notes: event flow / collaborating classes
+    class FN01_Start {
+        <<FN / 便條紙>>
+        FN01 開始
+        WaterballCommunity -> Bot
+        建立並交付 started 事件
+    }
+    class FN02_Login {
+        <<FN / 便條紙>>
+        FN02 登入
+        Member -> WaterballCommunity -> Participant
+        WaterballCommunity -> Bot
+    }
+    class FN03_Logout {
+        <<FN / 便條紙>>
+        FN03 登出
+        Member -> WaterballCommunity -> Participant
+        WaterballCommunity -> Bot
+    }
+    class FN04_Elapse {
+        <<FN / 便條紙>>
+        FN04 時間流逝
+        WaterballCommunity -> Bot
+        Bot 依時間事件更新遊戲
+    }
+    class FN05_Message {
+        <<FN / 便條紙>>
+        FN05 聊天新訊息
+        Member -> ChatRoom -> Message / Tag
+        WaterballCommunity -> Bot
+        Bot -> ChatRoom
+    }
+    class FN06_Post {
+        <<FN / 便條紙>>
+        FN06 發布貼文
+        Member -> Forum -> Post / Tag
+        WaterballCommunity -> Bot
+        Bot -> Forum -> Comment / Tag
+    }
+    class FN07_StartBroadcast {
+        <<FN / 便條紙>>
+        FN07 開始廣播
+        Member -> Broadcast
+        WaterballCommunity -> Bot
+    }
+    class FN08_Speak {
+        <<FN / 便條紙>>
+        FN08 傳遞語音
+        Member -> Broadcast -> VoiceMessage
+        WaterballCommunity -> Bot
+    }
+    class FN09_StopBroadcast {
+        <<FN / 便條紙>>
+        FN09 停止廣播
+        Member -> Broadcast
+        WaterballCommunity -> Bot
+        Bot -> ChatRoom (錄音回放時)
+    }
+    class FN10_End {
+        <<FN / 便條紙>>
+        FN10 程式結束
+        WaterballCommunity -> Bot
+        Bot 處理 end 事件
+    }
+
+    %% Static structure
+    WaterballCommunity "1" *-- "1" ChatRoom
+    WaterballCommunity "1" *-- "1" Forum
+    WaterballCommunity "1" *-- "1" Broadcast
+    WaterballCommunity "1" o-- "0..*" Participant : online participants
+    WaterballCommunity "1" *-- "1" Bot
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+    ChatRoom "1" o-- "0..*" Message
+    Forum "1" o-- "0..*" Post
+    Post "1" o-- "0..*" Comment
+    Broadcast "1" o-- "0..*" VoiceMessage
+    Message "1" o-- "0..*" Tag
+    Post "1" o-- "0..*" Tag
+    Comment "1" o-- "0..*" Tag
+    Tag --> Participant : mentions
+    WaterballCommunity ..> CommunityEvent : creates / dispatches
+    WaterballCommunity --> Bot : notifies
+    Bot ..> CommunityEvent : receives
+    Bot --> ChatRoom : reads / sends
+    Bot --> Forum : reads / comments
+    Bot --> Broadcast : reads / broadcasts
+
+    %% Each dotted link anchors a sticky note to the classes it describes.
+    FN01_Start ..> WaterballCommunity
+    FN01_Start ..> Bot
+    FN02_Login ..> Member
+    FN02_Login ..> WaterballCommunity
+    FN02_Login ..> Participant
+    FN02_Login ..> Bot
+    FN03_Logout ..> Member
+    FN03_Logout ..> WaterballCommunity
+    FN03_Logout ..> Participant
+    FN03_Logout ..> Bot
+    FN04_Elapse ..> WaterballCommunity
+    FN04_Elapse ..> Bot
+    FN05_Message ..> Member
+    FN05_Message ..> ChatRoom
+    FN05_Message ..> Message
+    FN05_Message ..> Tag
+    FN05_Message ..> Bot
+    FN06_Post ..> Member
+    FN06_Post ..> Forum
+    FN06_Post ..> Post
+    FN06_Post ..> Comment
+    FN06_Post ..> Tag
+    FN06_Post ..> Bot
+    FN07_StartBroadcast ..> Member
+    FN07_StartBroadcast ..> Broadcast
+    FN07_StartBroadcast ..> Bot
+    FN08_Speak ..> Member
+    FN08_Speak ..> Broadcast
+    FN08_Speak ..> VoiceMessage
+    FN08_Speak ..> Bot
+    FN09_StopBroadcast ..> Member
+    FN09_StopBroadcast ..> Broadcast
+    FN09_StopBroadcast ..> Bot
+    FN09_StopBroadcast ..> ChatRoom
+    FN10_End ..> WaterballCommunity
+    FN10_End ..> Bot
+
+    classDef sticky fill:#FFF3A6,stroke:#B8860B,color:#3D3200,stroke-width:2px
+    class FN01_Start sticky
+    class FN02_Login sticky
+    class FN03_Logout sticky
+    class FN04_Elapse sticky
+    class FN05_Message sticky
+    class FN06_Post sticky
+    class FN07_StartBroadcast sticky
+    class FN08_Speak sticky
+    class FN09_StopBroadcast sticky
+    class FN10_End sticky
