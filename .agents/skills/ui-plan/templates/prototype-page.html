@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{PAGE_TITLE}}</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>{{PAGE_HEADING}}</h1>
+    <button class="btn btn-primary" type="button" id="{{PRIMARY_ACTION_ID}}">{{PRIMARY_ACTION_LABEL}}</button>
+  </header>
+
+  <div class="banner" id="banner"></div>
+  <p class="status hidden" id="loading">{{LOADING_COPY}}</p>
+
+  <section class="empty" id="empty">
+    <h2>{{EMPTY_TITLE}}</h2>
+    <p>{{EMPTY_BODY}}</p>
+    <button class="btn btn-primary" type="button" id="{{EMPTY_ACTION_ID}}">{{PRIMARY_ACTION_LABEL}}</button>
+  </section>
+
+  <div id="{{MAIN_CONTENT_ID}}" class="{{MAIN_CONTENT_CLASS}}">
+    {{MAIN_CONTENT_HTML}}
+  </div>
+
+  {{OPTIONAL_DIALOG_HTML}}
+
+  <script>
+    const COPY = {
+      {{COPY_OBJECT_ENTRIES}}
+    };
+    {{PAGE_SCRIPT}}
+  </script>
+</body>
+</html>

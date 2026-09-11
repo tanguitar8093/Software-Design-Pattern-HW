@@ -1,0 +1,49 @@
+:root {
+  --bg: {{PAGE_BACKGROUND}};
+  --surface: {{SURFACE_COLOR}};
+  --ink: {{TEXT_COLOR}};
+  --muted: {{MUTED_TEXT_COLOR}};
+  --line: {{LINE_COLOR}};
+  --accent: {{ACCENT_COLOR}};
+  --accent-hover: {{ACCENT_HOVER_COLOR}};
+  --danger: {{DANGER_COLOR}};
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: {{FONT_STACK}};
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.empty {
+  display: none;
+  text-align: center;
+}
+
+.empty.is-visible { display: block; }
+
+.banner { display: none; }
+.banner.is-visible { display: flex; }
+.hidden { display: none !important; }
+
+{{ADDITIONAL_LAYOUT_CSS}}

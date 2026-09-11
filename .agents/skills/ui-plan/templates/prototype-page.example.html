@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>相簿</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>相簿</h1>
+    <button class="btn btn-primary" type="button" id="createAlbum">建立相簿</button>
+  </header>
+
+  <div class="banner" id="banner"></div>
+  <p class="status hidden" id="loading">載入相簿中…</p>
+
+  <section class="empty" id="empty">
+    <h2>還沒有相簿</h2>
+    <p>建立第一個相簿，開始整理照片。</p>
+    <button class="btn btn-primary" type="button" id="createAlbumEmpty">建立相簿</button>
+  </section>
+
+  <div id="groups" class="groups">
+    <section class="group" data-group-date="2026-07-11">
+      <h2 class="group-date">2026-07-11</h2>
+      <div class="album-grid" data-drop-group="2026-07-11">
+        <a class="album-card" draggable="true" href="album.html?id=alb_01HZX2K9M3Q8R7N6P5T4V3W2X1&amp;name=%E6%97%85%E8%A1%8C" data-album-id="alb_01HZX2K9M3Q8R7N6P5T4V3W2X1">
+          <span class="cover mosaic" aria-hidden="true">
+            <span class="tone-clay"></span>
+            <span class="tone-sand"></span>
+            <span class="tone-dusk"></span>
+            <span class="tone-olive"></span>
+          </span>
+          <div class="album-meta">
+            <h2>旅行</h2>
+            <p>5 張</p>
+          </div>
+        </a>
+        <a class="album-card" draggable="true" href="album.html?id=alb_01HZX2K9M3Q8R7N6P5T4V3W2Y2&amp;name=%E5%AE%B6%E5%BA%AD" data-album-id="alb_01HZX2K9M3Q8R7N6P5T4V3W2Y2">
+          <span class="cover is-empty" aria-hidden="true"></span>
+          <div class="album-meta">
+            <h2>家庭</h2>
+            <p>0 張</p>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <section class="group" data-group-date="2026-07-20">
+      <h2 class="group-date">2026-07-20</h2>
+      <div class="album-grid" data-drop-group="2026-07-20">
+        <a class="album-card" draggable="true" href="album.html?id=alb_01HZX2K9M3Q8R7N6P5T4V3W2Z3&amp;name=%E5%B7%A5%E4%BD%9C" data-album-id="alb_01HZX2K9M3Q8R7N6P5T4V3W2Z3">
+          <span class="cover mosaic" aria-hidden="true">
+            <span class="tone-slate"></span>
+            <span class="tone-dusk"></span>
+            <span class="tone-olive"></span>
+            <span class="tone-sand"></span>
+          </span>
+          <div class="album-meta">
+            <h2>工作</h2>
+            <p>12 張</p>
+          </div>
+        </a>
+      </div>
+    </section>
+  </div>
+
+  <dialog class="dialog-backdrop" id="createDialog">
+    <form class="dialog-panel" id="createForm" method="dialog">
+      <h2>建立相簿</h2>
+      <label for="albumName">相簿名稱</label>
+      <input id="albumName" name="name" type="text" placeholder="例如：旅行" autocomplete="off" />
+      <p class="field-error" id="createError"></p>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" type="button" id="cancelCreate">取消</button>
+        <button class="btn btn-primary" type="submit">建立</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const COPY = {
+      loadError: "無法載入相簿",
+      retry: "再試一次",
+      notFound: "找不到這個相簿",
+      createInvalid: "請輸入相簿名稱",
+      createError: "無法建立相簿"
+    };
+    const params = new URLSearchParams(location.search);
+    const groups = document.getElementById("groups");
+    const empty = document.getElementById("empty");
+    const loading = document.getElementById("loading");
+    const banner = document.getElementById("banner");
+    const dialog = document.getElementById("createDialog");
+    const createError = document.getElementById("createError");
+    const albumName = document.getElementById("albumName");
+
+    function showBanner(text, isError) {
+      banner.classList.add("is-visible");
+      banner.classList.toggle("is-error", Boolean(isError));
+      banner.textContent = text;
+    }
+
+    if (params.get("loading") === "1") {
+      groups.classList.add("hidden");
+      loading.classList.remove("hidden");
+    }
+
+    if (params.get("empty") === "1") {
+      groups.classList.add("hidden");
+      empty.classList.add("is-visible");
+    }
+
+    if (params.get("error") === "load") {
+      groups.classList.add("hidden");
+      banner.innerHTML = COPY.loadError + "。<button class=\"btn btn-ghost\" type=\"button\" id=\"retry\">" + COPY.retry + "</button>";
+      banner.classList.add("is-visible", "is-error");
+      document.getElementById("retry").addEventListener("click", () => {
+        location.href = "index.html";
+      });
+    }
+
+    if (params.get("notice") === "not_found") {
+      showBanner(COPY.notFound, false);
+    }
+
+    function openCreate(initialError) {
+      createError.textContent = typeof initialError === "string" ? initialError : "";
+      albumName.value = "";
+      dialog.showModal();
+      albumName.focus();
+    }
+
+    if (params.get("error") === "create") {
+      openCreate(COPY.createError);
+    }
+
+    document.getElementById("createAlbum").addEventListener("click", () => openCreate());
+    document.getElementById("createAlbumEmpty").addEventListener("click", () => openCreate());
+    document.getElementById("cancelCreate").addEventListener("click", () => dialog.close());
+
+    document.getElementById("createForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = albumName.value.trim();
+      if (!name) {
+        createError.textContent = COPY.createInvalid;
+        return;
+      }
+      const id = "alb_new_" + Date.now();
+      location.href = "album.html?id=" + encodeURIComponent(id) + "&name=" + encodeURIComponent(name);
+    });
+
+    let dragging = null;
+
+    document.querySelectorAll(".album-card").forEach((card) => {
+      card.addEventListener("dragstart", (event) => {
+        dragging = card;
+        event.dataTransfer.effectAllowed = "move";
+      });
+      card.addEventListener("dragend", () => {
+        dragging = null;
+        document.querySelectorAll(".album-card").forEach((item) => item.classList.remove("is-drop-target"));
+      });
+    });
+
+    document.querySelectorAll("[data-drop-group]").forEach((grid) => {
+      grid.addEventListener("dragover", (event) => {
+        if (!dragging) return;
+        const fromGroup = dragging.closest("[data-drop-group]").dataset.dropGroup;
+        if (fromGroup !== grid.dataset.dropGroup) return;
+        event.preventDefault();
+        const target = event.target.closest(".album-card");
+        document.querySelectorAll(".album-card").forEach((item) => item.classList.remove("is-drop-target"));
+        if (target && target !== dragging) target.classList.add("is-drop-target");
+      });
+      grid.addEventListener("drop", (event) => {
+        event.preventDefault();
+        if (!dragging) return;
+        const fromGroup = dragging.closest("[data-drop-group]").dataset.dropGroup;
+        if (fromGroup !== grid.dataset.dropGroup) return;
+        const target = event.target.closest(".album-card");
+        if (!target || target === dragging) return;
+        grid.insertBefore(dragging, target);
+      });
+    });
+  </script>
+</body>
+</html>
