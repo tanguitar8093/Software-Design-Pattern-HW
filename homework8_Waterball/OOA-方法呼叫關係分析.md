@@ -5,7 +5,8 @@
 ---
 
 ## 術語規範與約定
-- **`Driver`**：指外部模擬驅動器（測試驅動器 / 控制器 / `main.py`），負責讀取測試輸入事件（如 `[login]`, `[new message]` 等）並觸發領域實體。
+- **`Client`**：指外部客戶端呼叫者（系統應用層 / 控制端 / 進入點程式），負責接收使用者或外界操作事件（如登入、發送訊息、時間流逝等）並驅動領域實體。
+  - **實作落地備註**：在後續撰寫 Python 實作程式碼時，這個 `Client` 在專案結構上通常會具體落地為 `main.py` 或單元測試檔案（Test Runner）；但在架構分析與 OOA 概念文件中，一律使用 **`Client`** 才是最純粹的物件導向抽象語言。
 - **`Member`**：指社群真人使用者。本文件不另用「講者」或「錄音者」等分歧詞彙；若需表示特定情境，統一標記為「正在廣播的 `Member`」或「發起錄音的 `Member`」。
 - **`Bot`**：指常駐於社群中的社群機器人。
   - 當欄位標註為 **`Bot (內部狀態判斷/主持流程)`** 時：代表此協作非由單一公開事件 API 直接觸發，而是 **Bot 內部（或狀態機運作）主動發起的協作與查詢**。
@@ -163,7 +164,7 @@
 【WaterballCommunity】
 - 主要行為：維護參與者在線清單、推進世界時鐘並通知 Bot 檢查規則
 - 觸發時機：模擬開始與系統事件（login, logout, elapsed）發生時
-- 被誰觸發：Driver
+- 被誰觸發：Client
 - 協作對象：Bot
 - 會觸發誰：Bot.onTimeElapsed()
 ```
@@ -173,7 +174,7 @@
 【Member】
 - 主要行為：主動在聊天室發話、在論壇發文留言，以及開啟麥克風進行廣播與發言
 - 觸發時機：成員收到系統輸入指令或自身意圖發起活動時
-- 被誰觸發：Driver
+- 被誰觸發：Client
 - 協作對象：ChatRoom, Forum, Broadcast
 - 會觸發誰：ChatRoom.postMessage(), Forum.createPost(), Forum.addComment(), Broadcast.start/speak/stop()
 ```
@@ -280,9 +281,9 @@
 
 | 方法 | 是誰 Call 它？ | 呼叫時機 / 觸發事件 | 被 Call 後做什麼？接著 Call 誰？ | 便條紙欄位 (結構化摘要) |
 | :--- | :--- | :--- | :--- | :--- |
-| `login(participant: Participant)` | `Driver` | 解析到 `[login]` 事件 | 將 `participant` 加入內部在線清單 `onlineParticipants`。 | **主要行為**：將成員加入在線名冊<br/>**觸發時機**：成員登入事件<br/>**被誰觸發**：Driver |
-| `logout(participantId: String)` | `Driver` | 解析到 `[logout]` 事件 | 將指定 `participantId` 從內部在線清單中移除。 | **主要行為**：將成員移出在線名冊<br/>**觸發時機**：成員登出事件<br/>**被誰觸發**：Driver |
-| `elapseTime(amount: int, unit: String)` | `Driver` | 解析到 `[<n> <time-unit> elapsed]` 事件 | 1. 推進內部屬性 `currentTime`。<br/>2. 呼叫 `Bot.onTimeElapsed(seconds)` 通知 `Bot` 進行時間檢查。 | **主要行為**：推進社群模擬時間並通知機器人檢查倒數規則<br/>**觸發時機**：時間流逝事件<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Bot.onTimeElapsed() |
+| `login(participant: Participant)` | `Client` | 外部發起登入事件 | 將 `participant` 加入內部在線清單 `onlineParticipants`。 | **主要行為**：將成員加入在線名冊<br/>**觸發時機**：成員登入事件<br/>**被誰觸發**：Client |
+| `logout(participantId: String)` | `Client` | 外部發起登出事件 | 將指定 `participantId` 從內部在線清單中移除。 | **主要行為**：將成員移出在線名冊<br/>**觸發時機**：成員登出事件<br/>**被誰觸發**：Client |
+| `elapseTime(amount: int, unit: String)` | `Client` | 外部推進時間流逝事件 | 1. 推進內部屬性 `currentTime`。<br/>2. 呼叫 `Bot.onTimeElapsed(seconds)` 通知 `Bot` 進行時間檢查。 | **主要行為**：推進社群模擬時間並通知機器人檢查倒數規則<br/>**觸發時機**：時間流逝事件<br/>**被誰觸發**：Client<br/>**會觸發誰**：Bot.onTimeElapsed() |
 | `getOnlineParticipants()` | `Bot` | `Bot.onPostPublished` 時 | 回傳目前所有在線的 `Participant` 清單（包含 `Member` 與 `Bot`）。 | **主要行為**：提供在線參與者名冊<br/>**觸發時機**：Bot 需標記全員回覆貼文時<br/>**被誰觸發**：Bot.onPostPublished() |
 | `getOnlineCount()` | `Bot` | `Bot` 收到新貼文或評估狀態時 | 計算並回傳在線總人數（包含 `Member` 與 `Bot`），供判斷是否 $\ge 10$ 人。 | **主要行為**：計算並回傳在線總人數<br/>**觸發時機**：Bot 評估狀態或回覆貼文門檻時<br/>**被誰觸發**：Bot (內部狀態判斷/主持流程) |
 
@@ -290,12 +291,12 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Driver
+    actor Client
     participant Community as WaterballCommunity
     participant Bot as Bot
 
-    Driver->>Community: login(member)
-    Driver->>Community: elapseTime(10, "seconds")
+    Client->>Community: login(member)
+    Client->>Community: elapseTime(10, "seconds")
     Community->>Bot: onTimeElapsed(10)
     Bot->>Community: getOnlineCount()
     Community-->>Bot: 10
@@ -309,30 +310,30 @@ sequenceDiagram
 
 | 方法 | 是誰 Call 它？ | 呼叫時機 / 觸發事件 | 被 Call 後做什麼？接著 Call 誰？ | 便條紙欄位 (結構化摘要) |
 | :--- | :--- | :--- | :--- | :--- |
-| `sendMessage(chatRoom, content, tags)` | `Driver` | 解析到 `[new message]` 事件 | 建立 `Message` 物件，呼叫 `ChatRoom.postMessage(message)`。 | **主要行為**：封裝聊天訊息並發送至聊天室<br/>**觸發時機**：成員聊天發言或下指令時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：ChatRoom.postMessage() |
-| `publishPost(forum, title, content, tags)` | `Driver` | 解析到 `[new post]` 事件 | 建立 `Post` 物件，呼叫 `Forum.createPost(post)`。 | **主要行為**：封裝主題貼文並發布至論壇<br/>**觸發時機**：成員在論壇發布新文章時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Forum.createPost() |
-| `commentPost(forum, postId, content, tags)` | `Driver` | 成員在貼文下留言時 | 建立 `Comment` 物件，呼叫 `Forum.addComment(postId, comment)`。 | **主要行為**：封裝留言內容並回覆指定貼文<br/>**觸發時機**：成員在貼文下留言時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Forum.addComment() |
-| `startBroadcast(broadcast)` | `Driver` | 解析到 `[go broadcasting]` 事件 | 呼叫 `Broadcast.start(this.id)` 請求開啟麥克風。 | **主要行為**：向廣播頻道請求開啟麥克風並開始廣播<br/>**觸發時機**：成員開啟廣播時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Broadcast.start() |
-| `speak(broadcast, content)` | `Driver` | 解析到 `[speak]` 事件 | 建立 `VoiceMessage` 物件，呼叫 `Broadcast.speak(voiceMessage)`。 | **主要行為**：傳遞即時說話語音給廣播頻道<br/>**觸發時機**：成員廣播講話時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Broadcast.speak() |
-| `stopBroadcast(broadcast)` | `Driver` | 解析到 `[stop broadcasting]` 事件 | 呼叫 `Broadcast.stop(this.id)` 請求釋放麥克風。 | **主要行為**：關閉麥克風並結束廣播<br/>**觸發時機**：成員結束廣播時<br/>**被誰觸發**：Driver<br/>**會觸發誰**：Broadcast.stop() |
+| `sendMessage(chatRoom, content, tags)` | `Client` | 成員發言或下指令時 | 建立 `Message` 物件，呼叫 `ChatRoom.postMessage(message)`。 | **主要行為**：封裝聊天訊息並發送至聊天室<br/>**觸發時機**：成員聊天發言或下指令時<br/>**被誰觸發**：Client<br/>**會觸發誰**：ChatRoom.postMessage() |
+| `publishPost(forum, title, content, tags)` | `Client` | 成員在論壇發布新文章時 | 建立 `Post` 物件，呼叫 `Forum.createPost(post)`。 | **主要行為**：封裝主題貼文並發布至論壇<br/>**觸發時機**：成員在論壇發布新文章時<br/>**被誰觸發**：Client<br/>**會觸發誰**：Forum.createPost() |
+| `commentPost(forum, postId, content, tags)` | `Client` | 成員在貼文下留言時 | 建立 `Comment` 物件，呼叫 `Forum.addComment(postId, comment)`。 | **主要行為**：封裝留言內容並回覆指定貼文<br/>**觸發時機**：成員在貼文下留言時<br/>**被誰觸發**：Client<br/>**會觸發誰**：Forum.addComment() |
+| `startBroadcast(broadcast)` | `Client` | 成員開啟廣播時 | 呼叫 `Broadcast.start(this.id)` 請求開啟麥克風。 | **主要行為**：向廣播頻道請求開啟麥克風並開始廣播<br/>**觸發時機**：成員開啟廣播時<br/>**被誰觸發**：Client<br/>**會觸發誰**：Broadcast.start() |
+| `speak(broadcast, content)` | `Client` | 成員廣播講話時 | 建立 `VoiceMessage` 物件，呼叫 `Broadcast.speak(voiceMessage)`。 | **主要行為**：傳遞即時說話語音給廣播頻道<br/>**觸發時機**：成員廣播講話時<br/>**被誰觸發**：Client<br/>**會觸發誰**：Broadcast.speak() |
+| `stopBroadcast(broadcast)` | `Client` | 成員結束廣播時 | 呼叫 `Broadcast.stop(this.id)` 請求釋放麥克風。 | **主要行為**：關閉麥克風並結束廣播<br/>**觸發時機**：成員結束廣播時<br/>**被誰觸發**：Client<br/>**會觸發誰**：Broadcast.stop() |
 
 #### 循序圖
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Driver
+    actor Client
     participant Member as Member
     participant ChatRoom as ChatRoom
     participant Forum as Forum
     participant Broadcast as Broadcast
 
-    Driver->>Member: sendMessage(chatRoom, content, tags)
+    Client->>Member: sendMessage(chatRoom, content, tags)
     Member->>ChatRoom: postMessage(message)
 
-    Driver->>Member: publishPost(forum, title, content, tags)
+    Client->>Member: publishPost(forum, title, content, tags)
     Member->>Forum: createPost(post)
 
-    Driver->>Member: startBroadcast(broadcast)
+    Client->>Member: startBroadcast(broadcast)
     Member->>Broadcast: start(this.id)
 ```
 
