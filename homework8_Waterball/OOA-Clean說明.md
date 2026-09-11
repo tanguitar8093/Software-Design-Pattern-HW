@@ -99,8 +99,7 @@
 ### 方法
 | 方法 | 回傳值 | 說明 |
 | --- | --- | --- |
-| `postMessage(message: Message)` | `void` | 將訊息加入聊天室記錄，並觸發讓機器人能讀取該訊息。 |
-| `getMessages()` | `List<Message>` | 取得歷史訊息紀錄清單。 |
+| `postMessage(message: Message)` | `void` | 即時輸出訊息至終端，並於非機器人發言時觸發讓機器人能讀取該訊息。 |
 
 ---
 
@@ -124,9 +123,8 @@
 ### 方法
 | 方法 | 回傳值 | 說明 |
 | --- | --- | --- |
-| `createPost(post: Post)` | `void` | 建立新貼文並納入論壇清單。 |
-| `addComment(postId: String, comment: Comment)` | `void` | 依貼文 ID 找到對應貼文，並將留言附加至該貼文下。 |
-| `getPost(id: String)` | `Post` | 查詢指定 ID 的貼文實體。 |
+| `createPost(post: Post)` | `void` | 建立新貼文並納入論壇清單，即時輸出至終端並通知機器人。 |
+| `addComment(postId: String, comment: Comment)` | `void` | 依貼文 ID 內部定位目標貼文，附加留言並即時輸出至終端。 |
 
 ---
 
@@ -147,7 +145,6 @@
 | 方法 | 回傳值 | 說明 |
 | --- | --- | --- |
 | `addComment(comment: Comment)` | `void` | 附加一則留言至本貼文底下。 |
-| `getComments()` | `List<Comment>` | 取得本貼文底下的所有留言紀錄。 |
 
 ---
 

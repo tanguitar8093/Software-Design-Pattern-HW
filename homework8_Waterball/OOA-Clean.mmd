@@ -47,7 +47,6 @@ Astah
 
     class ChatRoom {
         +postMessage(message: Message) void
-        +getMessages() List~Message~
     }
 
     class Message {
@@ -59,7 +58,6 @@ Astah
     class Forum {
         +createPost(post: Post) void
         +addComment(postId: String, comment: Comment) void
-        +getPost(id: String) Post
     }
 
     class Post {
@@ -69,7 +67,6 @@ Astah
         +content: String
         +tags: List~String~
         +addComment(comment: Comment) void
-        +getComments() List~Comment~
     }
 
     class Comment {
