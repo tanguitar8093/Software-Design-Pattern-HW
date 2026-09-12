@@ -52,7 +52,8 @@ stateDiagram-v2
         state "Thanks For Joining" as ThanksForJoining
 
         Questioning: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans)] / Bot.replyChatMessage("Congrats! you got the answer!", [author.id])
-        ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner()); [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
+        ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner())
+        ThanksForJoining: entry / [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
 
         Questioning --> Questioning: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && !KnowledgeKingGame.isFinished()]<br/>/ Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
         Questioning --> ThanksForJoining: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && KnowledgeKingGame.isFinished()]

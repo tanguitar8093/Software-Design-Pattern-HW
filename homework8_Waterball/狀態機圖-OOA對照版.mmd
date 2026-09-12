@@ -1,8 +1,8 @@
 stateDiagram-v2
     direction LR
 
-    [*] --> DefaultConversation: [community.getOnlineCount() < 10]
-    [*] --> Interacting: [community.getOnlineCount() >= 10]
+    [*] --> DefaultConversation: [WaterballCommunity.getOnlineCount() < 10]
+    [*] --> Interacting: [WaterballCommunity.getOnlineCount() >= 10]
 
     state "Default Conversation" as DefaultConversation
     state "Interacting" as Interacting
@@ -25,7 +25,8 @@ stateDiagram-v2
     Waiting: entry / 等待成員開始廣播
     Recording: onVoiceSpoken(voiceMsg) / RecordingSession.addVoice(voiceMsg)
 
-    ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner()); [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
+    ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner())
+    ThanksForJoining: entry / [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
 
     %% ==========================================
     %% 正常狀態間切換 (在線人數門檻)
