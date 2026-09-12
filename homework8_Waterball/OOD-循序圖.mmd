@@ -1,0 +1,82 @@
+sequenceDiagram
+    autonumber
+
+    %% 參與者分層定義
+    actor Client as 系統端 (Client)
+    participant Member as 成員 (Member: 1)
+    
+    box rgb(240, 248, 255) 社群頻道領域 (Subject)
+        participant ChatRoom as 聊天室 (ChatRoom)
+    end
+
+    box rgb(255, 250, 240) 機器人框架層 (Facade & Observer)
+        participant Bot as 社群機器人 (Bot Facade)
+        participant KingCmd as KingCommand (Command)
+    end
+
+    box rgb(245, 255, 250) 有限狀態機模組 (Composite State Pattern)
+        participant RootFSM as 根狀態機 (Root FSM)
+        participant NormalState as 正常複合狀態 (Normal CompositeState)
+        participant DefaultSubState as 預設對話子狀態 (DefaultConversation)
+        participant Trans as Transition (策略判斷)
+        participant Guard as QuotaRoleGuard (Strategy)
+        participant KingState as 知識王複合狀態 (KnowledgeKing)
+        participant QSubState as 出題子狀態 (Questioning)
+    end
+
+    box rgb(255, 240, 245) 領域模型實體
+        participant Game as 知識王競賽 (KnowledgeKingGame)
+    end
+
+    Note over Client, Game: 【場景】當前狀態：Normal (DefaultConversation)；管理員發送 "king @bot" 訊息
+
+    %% 1. 成員發言
+    Client->>Member: sendMessage(chatRoom, "king", ["bot"])
+    Member->>ChatRoom: postMessage(Message("king", tags=["bot"]))
+    Note over ChatRoom: 終端印出: 💬 1: king @bot
+
+    %% 2. 觀察者推播通知 Bot
+    ChatRoom->>Bot: notifyMessage(message)
+    Note over Bot, ChatRoom: [觀察者模式] 頻道解耦推播事件給 Bot
+
+    %% 3. Bot 門面委派事件至當前狀態機
+    Bot->>RootFSM: handleEvent(MessageEvent(message))
+    RootFSM->>NormalState: handleEvent(MessageEvent)
+    NormalState->>DefaultSubState: handleEvent(MessageEvent)
+    Note over RootFSM, DefaultSubState: [複合模式] 狀態機與狀態一致介面，階層委派事件
+
+    %% 4. 當前狀態先做訊息輪播回覆
+    DefaultSubState->>Bot: replyCurrentCycle(message)
+    Bot->>ChatRoom: postMessage(Message("good to hear", tags=["1"]))
+    Note over ChatRoom: 終端印出: 🤖: good to hear @1
+
+    %% 5. 指令模式解析與驗證 (Command + Guard Strategy)
+    Bot->>KingCmd: execute(context)
+    KingCmd->>Guard: evaluate(context)
+    Note over Guard: [策略模式] 檢查 author.isAdmin == true 且 community.quota >= 5
+    Guard-->>KingCmd: true (驗證通過)
+
+    %% 6. 扣除 Quota 與觸發狀態轉移
+    KingCmd->>Bot: decreaseQuota(5)
+    KingCmd->>RootFSM: fireTrigger("kingTrigger")
+
+    %% 7. 狀態機轉移生命週期 (Exit -> Transition Action -> Entry)
+    RootFSM->>Trans: transit(from=Normal, to=KnowledgeKing)
+    Trans->>NormalState: exit()
+    NormalState->>DefaultSubState: exit()
+    
+    %% 轉移動作：初始化遊戲
+    Trans->>Game: start(QuestionBank)
+    
+    Trans->>KingState: enter()
+    KingState->>QSubState: enter()
+    
+    %% 8. 進入出題狀態之 Entry Action
+    QSubState->>Bot: onEnter()
+    Bot->>ChatRoom: postMessage(Message("KnowledgeKing is started!"))
+    Note over ChatRoom: 終端印出: 🤖: KnowledgeKing is started!
+
+    Bot->>Game: getCurrentQuestion()
+    Game-->>Bot: Question(0, "請問哪個 SQL 語句用於選擇所有的行？", options=[...])
+    Bot->>ChatRoom: postMessage(Message("0. 請問哪個 SQL 語句用於選擇所有的行？\nA) SELECT *\n..."))
+    Note over ChatRoom: 終端印出考題 Q0 內容與選項

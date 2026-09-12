@@ -1,0 +1,84 @@
+stateDiagram-v2
+    direction LR
+
+    [*] --> DefaultConversation: [community.getOnlineCount() < 10]
+    [*] --> Interacting: [community.getOnlineCount() >= 10]
+
+    state "Default Conversation" as DefaultConversation
+    state "Interacting" as Interacting
+    state "Waiting" as Waiting
+    state "Recording" as Recording
+    state "Questioning" as Questioning
+    state "Thanks For Joining" as ThanksForJoining
+
+    %% ==========================================
+    %% 狀態內部行為 (Internal State Behaviors)
+    %% ==========================================
+    DefaultConversation: entry / Bot.resetReplyCycle()
+    DefaultConversation: onMessageReceived(msg) / Bot.replyChatMessage(Bot.getNextReplyMessage(), [msg.authorId])
+    DefaultConversation: onPostPublished(post) / Bot.commentPost(post.id, "Nice post", [post.authorId])
+
+    Interacting: entry / Bot.resetReplyCycle()
+    Interacting: onMessageReceived(msg) / Bot.replyChatMessage(Bot.getNextReplyMessage(), [msg.authorId])
+    Interacting: onPostPublished(post) / Bot.commentPost(post.id, "How do you guys think about it?", WaterballCommunity.getOnlineParticipants())
+
+    Waiting: entry / 等待成員開始廣播
+    Recording: onVoiceSpoken(voiceMsg) / RecordingSession.addVoice(voiceMsg)
+
+    ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner()); [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
+
+    %% ==========================================
+    %% 正常狀態間切換 (在線人數門檻)
+    %% ==========================================
+    DefaultConversation --> Interacting: login [WaterballCommunity.getOnlineCount() >= 10]
+    Interacting --> DefaultConversation: logout [WaterballCommunity.getOnlineCount() < 10]
+
+    %% ==========================================
+    %% 進入錄音狀態 (record 指令)
+    %% ==========================================
+    DefaultConversation --> Waiting: onMessageReceived("record @bot") [quota >= 3 && !Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=3, 建立 RecordingSession(author)
+    DefaultConversation --> Recording: onMessageReceived("record @bot") [quota >= 3 && Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=3, 建立 RecordingSession(author)
+    Interacting --> Waiting: onMessageReceived("record @bot") [quota >= 3 && !Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=3, 建立 RecordingSession(author)
+    Interacting --> Recording: onMessageReceived("record @bot") [quota >= 3 && Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=3, 建立 RecordingSession(author)
+
+    %% ==========================================
+    %% 錄音內部轉移 (廣播開麥 / 閉麥)
+    %% ==========================================
+    Waiting --> Recording: onBroadcastStarted(speakerId)
+    Recording --> Waiting: onBroadcastStopped(speakerId)<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [RecordingSession.recorderId])
+
+    %% ==========================================
+    %% 結束錄音狀態 (stop-recording 指令)
+    %% ==========================================
+    Waiting --> DefaultConversation: onMessageReceived("stop-recording @bot") [msg.authorId == RecordingSession.recorderId && WaterballCommunity.getOnlineCount() < 10]
+    Waiting --> Interacting: onMessageReceived("stop-recording @bot") [msg.authorId == RecordingSession.recorderId && WaterballCommunity.getOnlineCount() >= 10]
+    Recording --> DefaultConversation: onMessageReceived("stop-recording @bot") [msg.authorId == RecordingSession.recorderId && WaterballCommunity.getOnlineCount() < 10]<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [RecordingSession.recorderId])
+    Recording --> Interacting: onMessageReceived("stop-recording @bot") [msg.authorId == RecordingSession.recorderId && WaterballCommunity.getOnlineCount() >= 10]<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [RecordingSession.recorderId])
+
+    %% ==========================================
+    %% 進入知識王狀態 (king 指令)
+    %% ==========================================
+    DefaultConversation --> Questioning: onMessageReceived("king @bot") [author.role == Role.ADMIN && quota >= 5]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=5, 建立 KnowledgeKingGame, Bot.replyChatMessage("KnowledgeKing is started!", []), Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+    Interacting --> Questioning: onMessageReceived("king @bot") [author.role == Role.ADMIN && quota >= 5]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=5, 建立 KnowledgeKingGame, Bot.replyChatMessage("KnowledgeKing is started!", []), Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+
+    %% ==========================================
+    %% 知識王答題、推進與結算
+    %% ==========================================
+    Questioning --> Questioning: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && !KnowledgeKingGame.isFinished()]<br/>/ Bot.replyChatMessage("Congrats! you got the answer!", [author.id]), Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+    Questioning --> ThanksForJoining: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && KnowledgeKingGame.isFinished()]<br/>/ Bot.replyChatMessage("Congrats! you got the answer!", [author.id])
+    Questioning --> ThanksForJoining: onTimeElapsed(seconds) [KnowledgeKingGame.isTimeout(WaterballCommunity.currentTime)]
+
+    %% 再玩一次
+    Questioning --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5, Bot.replyChatMessage("KnowledgeKing is gonna start again!", []), 建立 KnowledgeKingGame, Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+    ThanksForJoining --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5, Bot.replyChatMessage("KnowledgeKing is gonna start again!", []), 建立 KnowledgeKingGame, Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+
+    %% ==========================================
+    %% 退出知識王狀態 (king-stop 指令 或 20秒超時)
+    %% ==========================================
+    Questioning --> DefaultConversation: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && WaterballCommunity.getOnlineCount() < 10]
+    Questioning --> Interacting: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && WaterballCommunity.getOnlineCount() >= 10]
+    ThanksForJoining --> DefaultConversation: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && WaterballCommunity.getOnlineCount() < 10]
+    ThanksForJoining --> Interacting: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && WaterballCommunity.getOnlineCount() >= 10]
+
+    ThanksForJoining --> DefaultConversation: onTimeElapsed(20) [WaterballCommunity.getOnlineCount() < 10]
+    ThanksForJoining --> Interacting: onTimeElapsed(20) [WaterballCommunity.getOnlineCount() >= 10]

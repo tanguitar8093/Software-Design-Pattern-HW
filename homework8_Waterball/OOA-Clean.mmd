@@ -34,6 +34,7 @@ Astah
     class Bot {
         +id: String = "bot"
         +quota: int
+        +replyCycleIndex: int
         +onMessageReceived(message: Message) void
         +onPostPublished(post: Post) void
         +onVoiceSpoken(voiceMessage: VoiceMessage) void
@@ -43,6 +44,8 @@ Astah
         +replyChatMessage(content: String, tags: List~String~) void
         +commentPost(postId: String, content: String, tags: List~String~) void
         +broadcastVoice(content: String) void
+        +resetReplyCycle() void
+        +getNextReplyMessage() String
     }
 
     class ChatRoom {

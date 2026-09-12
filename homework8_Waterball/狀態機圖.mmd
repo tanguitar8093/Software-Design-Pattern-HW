@@ -1,8 +1,8 @@
 stateDiagram-v2
     direction LR
 
-    [*] --> DefaultConversation: started [onlineCount < 10]
-    [*] --> Interacting: started [onlineCount >= 10]
+    [*] --> DefaultConversation: [community.getOnlineCount() < 10]
+    [*] --> Interacting: [community.getOnlineCount() >= 10]
 
     state "Default Conversation" as DefaultConversation
     state "Interacting" as Interacting
@@ -11,49 +11,74 @@ stateDiagram-v2
     state "Questioning" as Questioning
     state "Thanks For Joining" as ThanksForJoining
 
-    DefaultConversation: entry / resetReplyCycle(good to hear)
-    DefaultConversation: new message / replyCycle(good to hear, thank you, How are you)
-    DefaultConversation: new post / comment(Nice post, author)
+    %% ==========================================
+    %% 狀態內部行為 (Internal State Behaviors)
+    %% ==========================================
+    DefaultConversation: entry / resetReplyCycle("good to hear")
+    DefaultConversation: onMessageReceived(msg) / Bot.replyChatMessage(cycleReply, [msg.authorId])
+    DefaultConversation: onPostPublished(post) / Bot.commentPost(post.id, "Nice post", [post.authorId])
 
-    Interacting: entry / resetReplyCycle(Hi hi😁)
-    Interacting: new message / replyCycle(Hi hi😁, I like your idea!)
-    Interacting: new post / comment(How do you guys think about it?, bot -> loginOrder)
+    Interacting: entry / resetReplyCycle("Hi hi😁")
+    Interacting: onMessageReceived(msg) / Bot.replyChatMessage(cycleReply, [msg.authorId])
+    Interacting: onPostPublished(post) / Bot.commentPost(post.id, "How do you guys think about it?", community.getOnlineParticipants())
 
-    Waiting: entry / recorder retained
-    Recording: speak / record(voiceMessage)
+    Waiting: entry / retain recordingSession
+    Recording: onVoiceSpoken(voiceMsg) / RecordingSession.addVoice(voiceMsg)
 
-    ThanksForJoining: entry / announceResult(broadcast if no speaker, otherwise chat)
+    ThanksForJoining: entry / if (!Broadcast.isBroadcasting()) Bot.broadcastVoice(Game.getWinner()) else Bot.replyChatMessage(Game.getWinner(), [])
 
-    DefaultConversation --> Interacting: login [onlineCount >= 10]
-    Interacting --> DefaultConversation: logout [onlineCount < 10]
+    %% ==========================================
+    %% 正常狀態間切換 (在線人數門檻)
+    %% ==========================================
+    DefaultConversation --> Interacting: login [community.getOnlineCount() >= 10]
+    Interacting --> DefaultConversation: logout [community.getOnlineCount() < 10]
 
-    DefaultConversation --> Waiting: record @bot [quota >= 3 && no speaker] / reply + decreaseQuota(3) + setRecorder(author)
-    DefaultConversation --> Recording: record @bot [quota >= 3 && speaker exists] / reply + decreaseQuota(3) + setRecorder(author)
-    Interacting --> Waiting: record @bot [quota >= 3 && no speaker] / reply + decreaseQuota(3) + setRecorder(author)
-    Interacting --> Recording: record @bot [quota >= 3 && speaker exists] / reply + decreaseQuota(3) + setRecorder(author)
+    %% ==========================================
+    %% 進入錄音狀態 (record 指令)
+    %% ==========================================
+    DefaultConversation --> Waiting: onMessageReceived("record @bot") [quota >= 3 && !Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=3 + init RecordingSession(author)
+    DefaultConversation --> Recording: onMessageReceived("record @bot") [quota >= 3 && Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=3 + init RecordingSession(author)
+    Interacting --> Waiting: onMessageReceived("record @bot") [quota >= 3 && !Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=3 + init RecordingSession(author)
+    Interacting --> Recording: onMessageReceived("record @bot") [quota >= 3 && Broadcast.isBroadcasting()]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=3 + init RecordingSession(author)
 
-    Waiting --> Recording: go broadcasting
-    Recording --> Waiting: stop broadcasting / sendRecordReplay(recorder)
+    %% ==========================================
+    %% 錄音內部轉移 (廣播開麥 / 閉麥)
+    %% ==========================================
+    Waiting --> Recording: onBroadcastStarted(speakerId)
+    Recording --> Waiting: onBroadcastStopped(speakerId)<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [recorderId])
 
-    Waiting --> DefaultConversation: stop-recording @bot [author == recorder && onlineCount < 10]
-    Waiting --> Interacting: stop-recording @bot [author == recorder && onlineCount >= 10]
-    Recording --> DefaultConversation: stop-recording @bot [author == recorder && onlineCount < 10] / sendRecordReplay(recorder)
-    Recording --> Interacting: stop-recording @bot [author == recorder && onlineCount >= 10] / sendRecordReplay(recorder)
+    %% ==========================================
+    %% 結束錄音狀態 (stop-recording 指令)
+    %% ==========================================
+    Waiting --> DefaultConversation: onMessageReceived("stop-recording @bot") [msg.authorId == session.recorderId && community.getOnlineCount() < 10]
+    Waiting --> Interacting: onMessageReceived("stop-recording @bot") [msg.authorId == session.recorderId && community.getOnlineCount() >= 10]
+    Recording --> DefaultConversation: onMessageReceived("stop-recording @bot") [msg.authorId == session.recorderId && community.getOnlineCount() < 10]<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [recorderId])
+    Recording --> Interacting: onMessageReceived("stop-recording @bot") [msg.authorId == session.recorderId && community.getOnlineCount() >= 10]<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [recorderId])
 
-    DefaultConversation --> Questioning: king @bot [author.isAdmin && quota >= 5] / reply + decreaseQuota(5) + start + ask(Q0)
-    Interacting --> Questioning: king @bot [author.isAdmin && quota >= 5] / reply + decreaseQuota(5) + start + ask(Q0)
+    %% ==========================================
+    %% 進入知識王狀態 (king 指令)
+    %% ==========================================
+    DefaultConversation --> Questioning: onMessageReceived("king @bot") [author.role == Role.ADMIN && quota >= 5]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=5 + init KnowledgeKingGame() + Bot.replyChatMessage("KnowledgeKing is started!", []) + Bot.replyChatMessage(Game.getCurrentQuestion().description, [])
+    Interacting --> Questioning: onMessageReceived("king @bot") [author.role == Role.ADMIN && quota >= 5]<br/>/ Bot.replyChatMessage(cycleReply, [author]) + quota-=5 + init KnowledgeKingGame() + Bot.replyChatMessage("KnowledgeKing is started!", []) + Bot.replyChatMessage(Game.getCurrentQuestion().description, [])
 
-    Questioning --> Questioning: correct answer @bot [firstCorrect && question remains] / score(author) + ask(nextQuestion)
-    Questioning --> ThanksForJoining: correct answer @bot [firstCorrect && allQuestionsDone] / score(author)
-    Questioning --> ThanksForJoining: 1 hour elapsed
+    %% ==========================================
+    %% 知識王答題、推進與結算
+    %% ==========================================
+    Questioning --> Questioning: onMessageReceived(ans) [Game.submitAnswer(author.id, ans) && !Game.isFinished()]<br/>/ Bot.replyChatMessage("Congrats! you got the answer!", [author.id]) + Bot.replyChatMessage(Game.getCurrentQuestion().description, [])
+    Questioning --> ThanksForJoining: onMessageReceived(ans) [Game.submitAnswer(author.id, ans) && Game.isFinished()]<br/>/ Bot.replyChatMessage("Congrats! you got the answer!", [author.id])
+    Questioning --> ThanksForJoining: onTimeElapsed(seconds) [Game.isTimeout(community.currentTime)]
 
-    Questioning --> Questioning: play again @bot [quota >= 5] / decreaseQuota(5) + startAgain + ask(Q0)
-    ThanksForJoining --> Questioning: play again @bot [quota >= 5] / decreaseQuota(5) + startAgain + ask(Q0)
+    %% 再玩一次
+    Questioning --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5 + Bot.replyChatMessage("KnowledgeKing is gonna start again!", []) + init KnowledgeKingGame() + Bot.replyChatMessage(Game.getCurrentQuestion().description, [])
+    ThanksForJoining --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5 + Bot.replyChatMessage("KnowledgeKing is gonna start again!", []) + init KnowledgeKingGame() + Bot.replyChatMessage(Game.getCurrentQuestion().description, [])
 
-    Questioning --> DefaultConversation: king-stop @bot [author.isAdmin && onlineCount < 10]
-    Questioning --> Interacting: king-stop @bot [author.isAdmin && onlineCount >= 10]
-    ThanksForJoining --> DefaultConversation: king-stop @bot [author.isAdmin && onlineCount < 10]
-    ThanksForJoining --> Interacting: king-stop @bot [author.isAdmin && onlineCount >= 10]
+    %% ==========================================
+    %% 退出知識王狀態 (king-stop 指令 或 20秒超時)
+    %% ==========================================
+    Questioning --> DefaultConversation: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && community.getOnlineCount() < 10]
+    Questioning --> Interacting: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && community.getOnlineCount() >= 10]
+    ThanksForJoining --> DefaultConversation: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && community.getOnlineCount() < 10]
+    ThanksForJoining --> Interacting: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN && community.getOnlineCount() >= 10]
 
-    ThanksForJoining --> DefaultConversation: 20 seconds elapsed [onlineCount < 10]
-    ThanksForJoining --> Interacting: 20 seconds elapsed [onlineCount >= 10]
+    ThanksForJoining --> DefaultConversation: onTimeElapsed(20) [community.getOnlineCount() < 10]
+    ThanksForJoining --> Interacting: onTimeElapsed(20) [community.getOnlineCount() >= 10]
