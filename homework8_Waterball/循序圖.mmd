@@ -1,0 +1,96 @@
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Member as Member
+    participant Community as WaterballCommunity
+    participant ChatRoom as ChatRoom
+    participant Forum as Forum
+    participant Broadcast as Broadcast
+    participant Bot as Bot
+    participant Game as KnowledgeKingGame
+    participant Question as Question
+    participant Recording as RecordingSession
+
+    Note over Client,Bot: 場景一：正常狀態下的聊天輪播回覆
+    Client->>Member: sendMessage(chatRoom, content, tags)
+    Member->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: onMessageReceived(message)
+    Bot->>Bot: replyChatMessage(輪播內容, tags)
+    Bot->>ChatRoom: postMessage(replyMessage)
+
+    Note over Client,Game: 場景二：管理員下達 king 指令，啟動知識王
+    Client->>Member: sendMessage(chatRoom, "king", ["bot"])
+    Member->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: onMessageReceived(message)
+    Bot->>Bot: replyChatMessage(輪播內容, tags)
+    Bot->>ChatRoom: postMessage(replyMessage)
+    Note right of Bot: 判斷權限/額度通過 -> 轉移至 KnowledgeKing 狀態
+    Bot->>Game: getCurrentQuestion()
+    Game-->>Bot: Question
+    Bot->>Bot: replyChatMessage(題目內容, [])
+    Bot->>ChatRoom: postMessage(questionMessage)
+
+    Note over Client,Game: 場景三：成員答題與結算
+    Client->>Member: sendMessage(chatRoom, answer, ["bot"])
+    Member->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: onMessageReceived(message)
+    Bot->>Game: submitAnswer(memberId, answer)
+    Game->>Question: isCorrect(answer)
+    Question-->>Game: true
+    Game-->>Bot: true (答對，計分並推進題目)
+    Bot->>Bot: replyChatMessage("Congrats! you got the answer!", [memberId])
+    Bot->>Game: isFinished()
+    Game-->>Bot: true
+    Bot->>Game: getWinner()
+    Game-->>Bot: winnerId 或 "Tie!"
+    Bot->>Broadcast: isBroadcasting()
+    Broadcast-->>Bot: false
+    Bot->>Bot: broadcastVoice(結果內容)
+    Bot->>Broadcast: start("bot")
+    Bot->>Broadcast: speak(voiceMessage)
+    Bot->>Broadcast: stop("bot")
+    Note right of Bot: 20 秒後 (onTimeElapsed) 轉移回 Normal 狀態
+
+    Note over Client,Recording: 場景四：錄音狀態
+    Client->>Member: sendMessage(chatRoom, "record", ["bot"])
+    Member->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: onMessageReceived(message)
+    Bot->>Bot: replyChatMessage(輪播內容, tags)
+    Bot->>ChatRoom: postMessage(replyMessage)
+    Note right of Bot: 轉移至 Record 狀態 (Waiting)
+
+    Client->>Member: startBroadcast(broadcast)
+    Member->>Broadcast: start(speakerId)
+    Broadcast->>Bot: onBroadcastStarted(speakerId)
+    Note right of Bot: 轉移至 Recording 子狀態
+
+    Client->>Member: speak(broadcast, content)
+    Member->>Broadcast: speak(voiceMessage)
+    Broadcast->>Bot: onVoiceSpoken(voiceMessage)
+    Bot->>Recording: addVoice(voiceMessage)
+
+    Client->>Member: stopBroadcast(broadcast)
+    Member->>Broadcast: stop(speakerId)
+    Broadcast->>Bot: onBroadcastStopped(speakerId)
+    Bot->>Recording: generateReplay()
+    Recording-->>Bot: "[Record Replay] ..."
+    Bot->>Bot: replyChatMessage(replayText, [recorderId])
+    Bot->>ChatRoom: postMessage(replyMessage)
+
+    Client->>Member: sendMessage(chatRoom, "stop-recording", ["bot"])
+    Member->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: onMessageReceived(message)
+    Bot->>Recording: generateReplay()
+    Recording-->>Bot: "[Record Replay] ..." (若有錄到內容)
+    Bot->>Bot: replyChatMessage(replayText, [recorderId])
+    Note right of Bot: 轉移回 Normal 狀態
+
+    Note over Client,Forum: 場景五：論壇貼文互動
+    Client->>Member: publishPost(forum, title, content, tags)
+    Member->>Forum: createPost(post)
+    Forum->>Bot: onPostPublished(post)
+    Bot->>Community: getOnlineCount()
+    Community-->>Bot: 在線人數
+    Bot->>Bot: commentPost(postId, "Nice post", [authorId])
+    Bot->>Forum: addComment(postId, comment)
+    Forum->>Post: addComment(comment)
