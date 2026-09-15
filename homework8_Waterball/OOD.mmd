@@ -210,7 +210,7 @@ classDiagram
     class BotFacade {
         <<Facade>>
         +state(name: String) BotFacade
-        +command(cmd: BotCommand) BotFacade
+        +command(name: String, cmd: BotCommand) BotFacade
         +transition(from: String, to: String, event: String) BotFacade
         +build() Bot
     }
@@ -220,6 +220,9 @@ classDiagram
         +quota: int
         +replyCycleIndex: int
         -fsm: FiniteStateMachine
+        -commands: Map~String, BotCommand~
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(cmdName: String, member: Member) void
         +onMessageReceived(message: Message) void
         +onPostPublished(post: Post) void
         +onBroadcastStarted(speakerId: String) void
@@ -308,7 +311,9 @@ classDiagram
     Participant <|-- Bot
     CommunityObserver <|.. Bot : 監聽社群事件
     Bot "1" *-- "1" FiniteStateMachine : 驅動狀態機
+    Bot "1" o-- "0..*" BotCommand : 註冊與持有指令集合 (Invoker)
     BotFacade ..> Bot : build()
+    BotFacade ..> BotCommand : 註冊指令設定
     BotFacade ..> FiniteStateMachine : 組裝 FSM 與轉移
 
     %% Command 繼承體系
@@ -318,6 +323,16 @@ classDiagram
     AbstractBotCommand <|-- StopRecordingCommand
     AbstractBotCommand <|-- KingStopCommand
     AbstractBotCommand <|-- PlayAgainCommand
+
+    %% Command 對 Receiver 的呼叫 (依據 ood分析.md 之 Command SOP 描述)
+    KingCommand ..> KnowledgeKingGame : 啟動遊戲 (Receiver)
+    KingCommand ..> FiniteStateMachine : 觸發轉移進入知識王狀態
+    RecordCommand ..> RecordingSession : 初始化錄音會話 (Receiver)
+    RecordCommand ..> FiniteStateMachine : 觸發轉移進入錄音狀態
+    StopRecordingCommand ..> RecordingSession : 產出 Replay
+    StopRecordingCommand ..> FiniteStateMachine : 觸發轉移回正常狀態
+    PlayAgainCommand ..> KnowledgeKingGame : 重啟遊戲
+    KingStopCommand ..> FiniteStateMachine : 觸發轉移回正常狀態
 
     %% Strategy 實作關聯
     Guard <|.. PermissionGuard
