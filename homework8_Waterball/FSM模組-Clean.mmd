@@ -1,0 +1,121 @@
+classDiagram
+    direction TB
+
+    %% ================================================================
+    %% FSM 模組（獨立套件，完全不認識「社群機器人」這個概念）
+    %% 對應 README 設計需求 -1 的四點要求：
+    %%   1) 輕鬆建立 FSM、注入行為
+    %%   2) 修改 Transition / 擴充 State / 擴充 Trigger,Guard,Action 均不修改既有程式碼 (OCP)
+    %%   3) 支援任意深度子狀態機
+    %%   4) 子狀態機以「插件」形式存在，不修改 FiniteStateMachine 既有程式碼
+    %% ================================================================
+
+    class Trigger {
+        +name: String
+        +payload: Map
+    }
+
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+    }
+    TransitionContext --> Trigger
+
+    class Guard {
+        <<interface, Strategy>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+    class AndGuard {
+        -guards: List~Guard~
+        +isSatisfied(context) bool
+    }
+    Guard <|.. AndGuard
+    AndGuard "1" o-- "1..*" Guard : 組合多個策略
+
+    class Action {
+        <<interface>>
+        +execute(context: TransitionContext) void
+    }
+    class CompositeAction {
+        -actions: List~Action~
+        +execute(context) void
+    }
+    Action <|.. CompositeAction
+    CompositeAction "1" o-- "0..*" Action : 依序執行
+
+    class Transition {
+        +from: State
+        +triggerName: String
+        +guard: Guard
+        +action: Action
+        +to: State
+        +tryHandle(context: TransitionContext) bool
+    }
+    Transition --> Guard : 條件
+    Transition --> Action : 效果
+    Transition --> "1" State : from
+    Transition --> "1" State : to
+
+    class TransitionChain {
+        <<Chain of Responsibility>>
+        -candidates: List~Transition~
+        +tryHandle(context: TransitionContext) Transition
+    }
+    TransitionChain "1" o-- "1..*" Transition : 依序嘗試直到 guard 通過
+
+    class State {
+        <<interface, Composite 的 Component>>
+        +id: String
+        +entryActions: List~Action~
+        +exitActions: List~Action~
+        +tryHandle(context: TransitionContext) bool
+        +enter(context: TransitionContext) void
+        +exit(context: TransitionContext) void
+    }
+
+    class SimpleState {
+        <<Composite 的 Leaf>>
+        +tryHandle(context) bool
+    }
+    State <|.. SimpleState
+
+    class CompositeState {
+        <<Composite 的 Composite / 子狀態機插件>>
+        -innerMachine: FiniteStateMachine
+        +tryHandle(context) bool
+    }
+    State <|.. CompositeState
+    CompositeState "1" *-- "1" FiniteStateMachine : innerMachine（遞迴，支援任意深度）
+
+    class FiniteStateMachine {
+        <<Template Method（fire 演算法骨架固定）>>
+        -currentState: State
+        -transitionsByTrigger: Map~String, TransitionChain~
+        +fire(trigger: Trigger) void
+        #resolveCandidates(triggerName: String) TransitionChain
+    }
+    FiniteStateMachine "1" o-- "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" TransitionChain
+    FiniteStateMachine ..> TransitionContext : 建立
+    FiniteStateMachine ..> StateMachineObserver : notify（Observer）
+
+    class StateMachineObserver {
+        <<interface, Observer>>
+        +onStateChanged(from: State, to: State, trigger: Trigger) void
+    }
+
+    class FiniteStateMachineBuilder {
+        <<Fluent 組裝語法糖，非 GoF Pattern>>
+        +state(id: String) FiniteStateMachineBuilder
+        +on(triggerName: String) FiniteStateMachineBuilder
+        +when(guard: Guard) FiniteStateMachineBuilder
+        +then(action: Action) FiniteStateMachineBuilder
+        +to(stateId: String) FiniteStateMachineBuilder
+        +build() FiniteStateMachine
+    }
+    FiniteStateMachineBuilder ..> FiniteStateMachine : 組裝產出
+
+    note for State "【Composite】State 是 Component 介面，\nSimpleState=Leaf，CompositeState=Composite（內部包一台完整 FiniteStateMachine）\n引擎只認識 State 介面，不需要知道現在操作的是不是子狀態機"
+    note for FiniteStateMachine "【Template Method】fire(trigger) 的骨架固定：\n1.resolveCandidates 2.TransitionChain 篩選 3.exit 舊狀態 4.執行 transition action 5.enter 新狀態\n『如何嘗試處理』交由 State.tryHandle() 多型決定（SimpleState 直接比對；CompositeState 會先委派給 innerMachine）"
+    note for TransitionChain "【Chain of Responsibility】同一個 from-state + triggerName 可能有多筆候選 Transition，\n依序嘗試每筆的 guard，第一個 guard 通過者即接手處理，其餘不受影響"
+    note for CompositeState "【OCP 對子狀態機的落實】完全不修改 FiniteStateMachine / Transition 既有程式碼，\n只要新增 CompositeState 這個 State 的實作，就能讓某個狀態『升級』成一台子狀態機，\n拿掉子狀態機支援只需不使用 CompositeState 即可（插件式功能）"

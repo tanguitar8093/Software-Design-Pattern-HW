@@ -1,0 +1,250 @@
+classDiagram
+    direction TB
+
+    %% ================================================================
+    %% 【領域層 Domain Layer】
+    %% 沿用 OOA-Clean.mmd 之核心概念，唯一差異：
+    %% ChatRoom / Forum / Broadcast / WaterballCommunity 不再直接依賴具體的 Bot，
+    %% 改為依賴 DomainEventListener 介面並提供 subscribe()（Observer 模式）。
+    %% ================================================================
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom, content, tags) void
+        +publishPost(forum, title, content, tags) void
+        +commentPost(forum, postId, content, tags) void
+        +startBroadcast(broadcast) void
+        +speak(broadcast, content) void
+        +stopBroadcast(broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class DomainEventListener {
+        <<interface>>
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+    }
+
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+        +subscribe(listener: DomainEventListener) void
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        +subscribe(listener: DomainEventListener) void
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        +subscribe(listener: DomainEventListener) void
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+        +subscribe(listener: DomainEventListener) void
+    }
+
+    class Message { +authorId: String
+        +content: String
+        +tags: List~String~ }
+    class Post { +id +authorId +title +content +tags
+        +addComment(comment: Comment) void }
+    class Comment { +authorId +content +tags }
+    class VoiceMessage { +speakerId +content }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number +description +options +correctAnswer
+        +isCorrect(answer: String) bool
+    }
+
+    Participant <|-- Member
+    Member --> Role
+    WaterballCommunity "1" *-- "1" ChatRoom
+    WaterballCommunity "1" *-- "1" Forum
+    WaterballCommunity "1" *-- "1" Broadcast
+    WaterballCommunity "1" o-- "0..*" Participant
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+
+    ChatRoom ..> DomainEventListener : notify（Observer）
+    Forum ..> DomainEventListener : notify（Observer）
+    Broadcast ..> DomainEventListener : notify（Observer）
+    WaterballCommunity ..> DomainEventListener : notify（Observer）
+
+    %% ================================================================
+    %% 【FSM 模組】對外可見介面（完整內部結構見 FSM模組-Clean.mmd）
+    %% ================================================================
+    class FiniteStateMachine {
+        <<FSM 模組 / Template Method>>
+        +fire(trigger: Trigger) void
+        +getCurrentState() State
+    }
+    class State {
+        <<interface, FSM 模組>>
+    }
+
+    %% ================================================================
+    %% 【Bot 模組】Facade + State + Command + Strategy(Guard)
+    %%           + Chain of Responsibility + Decorator
+    %% ================================================================
+    class BotFacade {
+        <<Facade>>
+        +state(name: String) BotFacade
+        +command(name: String) BotFacade
+        +permission(role: Role) BotFacade
+        +cost(quota: int) BotFacade
+        +effect(action: Action) BotFacade
+        +moveTo(stateId: String) BotFacade
+        +build() Bot
+    }
+
+    class Bot {
+        +id: String = "bot"
+        -fsm: FiniteStateMachine
+        -commandChain: CommandDispatchChain
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+    }
+
+    class BotState {
+        <<abstract, State 模式>>
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+    }
+    class DefaultConversationState
+    class InteractingState
+    class WaitingState
+    class RecordingState
+    class QuestioningState
+    class ThanksForJoiningState
+
+    class BotCommand {
+        <<interface, Command 模式>>
+        +canHandle(message: Message) bool
+        +execute(context: CommandContext) void
+    }
+    class KingCommand
+    class RecordCommand
+    class StopRecordingCommand
+    class KingStopCommand
+    class PlayAgainCommand
+
+    class CommandDispatchChain {
+        <<Chain of Responsibility>>
+        +dispatch(message: Message) bool
+    }
+
+    class Guard {
+        <<interface, Strategy 模式>>
+        +isSatisfied(context) bool
+    }
+    class PermissionGuard
+    class QuotaGuard
+    class GuardChain {
+        <<Chain of Responsibility>>
+        +check(context) bool
+    }
+
+    class Action {
+        <<interface>>
+        +execute(context) void
+    }
+    class QuotaDeductingActionDecorator {
+        <<Decorator>>
+        -inner: Action
+        -cost: int
+        +execute(context) void
+    }
+
+    Bot ..|> DomainEventListener
+    Bot "1" *-- "1" FiniteStateMachine
+    FiniteStateMachine "1" o-- "1" State : currentState
+    BotState ..|> State
+    DefaultConversationState --|> BotState
+    InteractingState --|> BotState
+    WaitingState --|> BotState
+    RecordingState --|> BotState
+    QuestioningState --|> BotState
+    ThanksForJoiningState --|> BotState
+
+    BotCommand <|.. KingCommand
+    BotCommand <|.. RecordCommand
+    BotCommand <|.. StopRecordingCommand
+    BotCommand <|.. KingStopCommand
+    BotCommand <|.. PlayAgainCommand
+
+    Bot --> CommandDispatchChain : 訊息先交由指令鏈嘗試
+    CommandDispatchChain "1" o-- "0..*" BotCommand : 依序嘗試 canHandle()
+
+    Guard <|.. PermissionGuard
+    Guard <|.. QuotaGuard
+    GuardChain "1" o-- "0..*" Guard : 依序檢查（先權限後額度）
+    BotCommand ..> GuardChain : 執行前必須先過關（不過則靜默失敗）
+
+    Action <|.. QuotaDeductingActionDecorator
+    QuotaDeductingActionDecorator --> Action : 包裝核心 Action 疊加扣額度行為
+
+    BotFacade ..> FiniteStateMachine : 內部組裝 Transition/Guard/Action
+    BotFacade ..> Bot : build() 產出
+
+    %% ================================================================
+    %% 【應用層 Application Layer】
+    %% ================================================================
+    class InputEventAdapter {
+        <<Adapter>>
+        +adapt(line: String) void
+    }
+    InputEventAdapter --> WaterballCommunity : 轉接呼叫
+    InputEventAdapter --> Member : 轉接呼叫
+    InputEventAdapter --> Bot : 掛載為 subscribe(listener)
+
+    note for BotFacade "【Facade】隱藏 FSM 模組（Guard 鏈、Decorator、Composite 子狀態機）組裝細節，\n讓開發者用最少語法描述 Bot 行為"
+    note for CommandDispatchChain "【Chain of Responsibility】訊息依序嘗試各 BotCommand.canHandle()，\n找到符合者才交給它 execute()，找不到則視為一般聊天"
+    note for GuardChain "【Chain of Responsibility + Strategy】PermissionGuard、QuotaGuard 為可替換的獨立策略，\n以鏈狀依序檢查，任何一關不過即整體靜默失敗"
+    note for QuotaDeductingActionDecorator "【Decorator】核心 Action（狀態轉移效果）與『扣除額度』橫切邏輯分離，\n可自由疊加 0~N 層，不需替每個 Command 各寫一份扣額度程式碼"
