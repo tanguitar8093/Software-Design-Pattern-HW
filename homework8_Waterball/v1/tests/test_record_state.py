@@ -9,7 +9,7 @@ def test_record_enter_when_already_broadcasting_goes_to_recording():
     此測試先有成員 4 開始廣播，成員 3 才下達 record @bot。
     機器人應直接處於 Recording 狀態，講者發言被記錄，講者下麥後立即輸出 Replay。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -46,7 +46,7 @@ def test_record_multiple_speakers_and_no_chat_reply_in_record():
     2. 多位講者先後上麥、說話、下麥，每次下麥皆產出該講者的 Replay，標記錄音者。
     3. 在 Waiting 狀態下下達 stop-recording，不會輸出任何 Replay，正常回到 Normal 狀態。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -102,7 +102,7 @@ def test_stop_recording_during_recording_flushes_current_replay():
     「如果此時為錄音中狀態，會將講者廣播過程中截至目前錄下的所有語音訊息，
     以 Record Replay 格式輸出、標記錄音者且傳訊到聊天室中，回到正常狀態。」
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -137,7 +137,7 @@ def test_non_recorder_cannot_stop_recording():
     「只有錄音者 (recorder) 方可使用 stop-recording。」
     非錄音者發送 stop-recording 時靜默失敗，錄音狀態持續進行。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',

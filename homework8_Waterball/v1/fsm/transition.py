@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.fsm.engine import FiniteStateMachine
-    from homework8_Waterball.v1.fsm.state import State
+    from .engine import FiniteStateMachine
+    from .state import State
 
 
 class Trigger:

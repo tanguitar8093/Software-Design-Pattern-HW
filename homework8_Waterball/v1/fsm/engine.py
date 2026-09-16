@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, List, Optional
-from homework8_Waterball.v1.fsm.state import State
-from homework8_Waterball.v1.fsm.transition import (
+from .state import State
+from .transition import (
     Transition,
     TransitionContext,
     Trigger,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, Optional
-from homework8_Waterball.v1.bot.bot import Bot
-from homework8_Waterball.v1.bot.commands import (
+from .bot import Bot
+from .commands import (
     BotCommand,
     KingCommand,
     KingStopCommand,
@@ -9,7 +9,7 @@ from homework8_Waterball.v1.bot.commands import (
     RecordCommand,
     StopRecordingCommand,
 )
-from homework8_Waterball.v1.bot.states import (
+from .states import (
     DefaultConversationState,
     InteractingState,
     IsBroadcastingGuard,
@@ -23,8 +23,8 @@ from homework8_Waterball.v1.bot.states import (
     ThanksForJoiningState,
     WaitingState,
 )
-from homework8_Waterball.v1.domain.community import WaterballCommunity
-from homework8_Waterball.v1.fsm import (
+from ..domain.community import WaterballCommunity
+from ..fsm import (
     Action,
     FiniteStateMachine,
     Guard,

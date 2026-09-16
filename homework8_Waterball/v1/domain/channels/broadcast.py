@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import List, Optional
-from homework8_Waterball.v1.common.events import (
+from ...common.events import (
     BroadcastStartedEvent,
     BroadcastStoppedEvent,
     VoiceSpokenEvent,
 )
-from homework8_Waterball.v1.common.observer import Observable
+from ...common.observer import Observable
 
 
 class VoiceMessage:

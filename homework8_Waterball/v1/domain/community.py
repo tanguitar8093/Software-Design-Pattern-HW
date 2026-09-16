@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import List, Optional
-from homework8_Waterball.v1.common.events import OnlineChangedEvent, TimeElapsedEvent
-from homework8_Waterball.v1.common.observer import Observable
-from homework8_Waterball.v1.domain.channels.broadcast import Broadcast
-from homework8_Waterball.v1.domain.channels.chat_room import ChatRoom
-from homework8_Waterball.v1.domain.channels.forum import Forum
-from homework8_Waterball.v1.domain.member import Member, Participant
+from ..common.events import OnlineChangedEvent, TimeElapsedEvent
+from ..common.observer import Observable
+from .channels.broadcast import Broadcast
+from .channels.chat_room import ChatRoom
+from .channels.forum import Forum
+from .member import Member, Participant
 
 
 class WaterballCommunity(Observable):

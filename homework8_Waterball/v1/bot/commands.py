@@ -1,14 +1,14 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-from homework8_Waterball.v1.common.enums import Role
-from homework8_Waterball.v1.domain.activities import KnowledgeKingGame, RecordingSession
-from homework8_Waterball.v1.domain.channels import Message
-from homework8_Waterball.v1.domain.member import Member
-from homework8_Waterball.v1.fsm import Trigger
+from ..common.enums import Role
+from ..domain.activities import KnowledgeKingGame, RecordingSession
+from ..domain.channels import Message
+from ..domain.member import Member
+from ..fsm import Trigger
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.bot.bot import Bot
+    from .bot import Bot
 
 
 class BotCommand(ABC):

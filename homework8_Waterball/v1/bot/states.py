@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
-from homework8_Waterball.v1.domain.activities import KnowledgeKingGame, RecordingSession
-from homework8_Waterball.v1.fsm import (
+from ..domain.activities import KnowledgeKingGame, RecordingSession
+from ..fsm import (
     Action,
     AtomicState,
     CompositeState,
@@ -12,7 +12,7 @@ from homework8_Waterball.v1.fsm import (
 )
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.bot.bot import Bot
+    from .bot import Bot
 
 
 # ================================================================

@@ -1,10 +1,10 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-from homework8_Waterball.v1.fsm.transition import TransitionContext
+from .transition import TransitionContext
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.fsm.engine import FiniteStateMachine
+    from .engine import FiniteStateMachine
 
 
 class State(ABC):

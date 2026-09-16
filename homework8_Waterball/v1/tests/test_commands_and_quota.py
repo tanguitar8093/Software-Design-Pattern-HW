@@ -11,7 +11,7 @@ def test_command_replies_chat_first_then_executes_transition():
     機器人會先回覆預設輪播訊息 good to hear @<發送者>，
     然後再進入知識王狀態並開始出題。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -42,7 +42,7 @@ def test_command_fails_silently_on_permission_denied():
     3. 但因該指令本身是一則聊天訊息，機器人仍會依當前狀態回覆輪播訊息。
     4. 隨後下達正常聊天訊息，可證明機器人仍處於正常狀態（繼續第二則輪播）。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -71,7 +71,7 @@ def test_command_fails_silently_on_insufficient_quota():
     4. 機器人仍回覆當前狀態輪播訊息。
     5. 接著任何成員執行 record @bot（需要 Quota 3，4 >= 3），成功扣額度並進入錄音狀態。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 4}',
@@ -102,7 +102,7 @@ def test_shared_quota_depletion_across_multiple_users():
     4. 管理員執行 king-stop（額度 0）回到正常狀態。
     5. 用戶 2 再次嘗試執行 record（需要 3，目前剩 0）-> 額度不足靜默失敗。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 8}',

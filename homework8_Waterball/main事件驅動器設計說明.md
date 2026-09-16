@@ -60,6 +60,7 @@
    將外界輸入的「純文字協議（Text/JSON）」還原為 Python 資料結構（dict, int, str）。
 3. **查表分派器 (Table-Driven Dispatcher)**：
    為了避免在應用層寫出難以維護的 `if-elif-else` 階梯，內部採用字典建立無狀態的事件處理對映表：
+
    ```python
    self._handlers = {
        "started": self._handle_started,
@@ -110,3 +111,78 @@
 | **是否符合 Adapter Pattern** | ❌ **不符合**。依課程投影片標準：無固定 Target 介面，且核心系統原始碼為自製可修改，不構成「不可修改 Adaptee」的 Forces 衝突。                                               |
 | **是否畫入設計圖**           | **不用細畫**。在 [oodv4.mmd](oodv4.mmd) 與 [oodv4-1.mmd](oodv4-1.mmd) 中以 `Client (Application Layer)` 代表即可，保持核心類別圖的乾淨與高凝聚。                            |
 | **架構收益**                 | 1. 隔離 JSON 字串解析與社群業務物件。<br/>2. 支援檔案批次評測、管線輸入與命令列即時 REPL 互動，無重複代碼。<br/>3. 維持主架構物件模型的純粹性。                             |
+
+---
+
+## 六、如何測試與執行的具體操作指南
+
+本模擬系統已支援多種靈活的執行與測試方式，並將官方測資規範存放於獨立且具語意的資料夾中：
+
+### 1. 測資檔案結構
+
+- 測試資料檔案統一放置於 `v1/data/` 目錄：
+  - [v1/data/input.txt](v1/data/input.txt)：完整包含 README.md 最底下的官方示範輸入事件串流。
+
+---
+
+### 2. 具體操作方式說明
+
+#### 方式一：指定檔案參數模式（批次檔案測試）
+
+直接將測資路徑作為命令列引數傳入，程式會一口氣讀取並輸出全部模擬結果：
+
+```bash
+python main.py ./data/input.txt
+```
+
+---
+
+#### 方式二：管道串接模式（Pipeline 標準輸入，對齊 OJ 測試規範）
+
+使用 Linux Pipeline `cat` 將檔案透過標準輸入傳入：
+
+```bash
+cat ./data/input.txt | python main.py
+```
+
+本方式與各大 Online Judge 平台的自動批改機行為完全一致。
+
+---
+
+#### 方式三：終端機即時互動式輸入（REPL 模式）
+
+若未傳入檔案參數且處於終端機 TTY 環境下，程式會自動進入即時互動模式。每輸入一行事件，機器人就會立刻產生對應回應，直到輸入 `[end]` 為止：
+
+```bash
+python main.py
+```
+
+**操作範例**：
+
+```text
+=== Waterball 互動式模擬環境已啟動 (輸入 [end] 結束) ===
+[started] {"time": "2023-08-07 00:00:00", "quota": 10}
+[login] {"userId": "1", "isAdmin": false}
+[new message] {"authorId": "1", "content": "哈囉機器人", "tags": []}
+💬 1: 哈囉機器人
+🤖: good to hear @1
+[new message] {"authorId": "1", "content": "今天天氣真好", "tags": []}
+💬 1: 今天天氣真好
+🤖: thank you @1
+[end]
+=== 模擬結束 ===
+```
+
+---
+
+#### 方式四：使用 pytest 查看完整測試輸出過程
+
+pytest 預設會攔截標準輸出，若要在跑測試時即時在螢幕上看到機器人完整的聊天與廣播文字輸出，請加上 **`-s`**（即 `--capture=no`）旗標：
+
+```bash
+# 執行 README 端到端完整範例測試並印出全部過程：
+pytest tests/test_readme_e2e.py -s
+
+# 執行全體 18 個測項並即時印出所有過程：
+pytest tests/ -v -s
+```

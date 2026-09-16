@@ -1,5 +1,5 @@
-from homework8_Waterball.v1.domain.activities import KnowledgeKingGame, Question, RecordingSession
-from homework8_Waterball.v1.domain.channels import (
+from .activities import KnowledgeKingGame, Question, RecordingSession
+from .channels import (
     Broadcast,
     ChatRoom,
     Comment,
@@ -8,8 +8,8 @@ from homework8_Waterball.v1.domain.channels import (
     Post,
     VoiceMessage,
 )
-from homework8_Waterball.v1.domain.community import WaterballCommunity
-from homework8_Waterball.v1.domain.member import Member, Participant
+from .community import WaterballCommunity
+from .member import Member, Participant
 
 __all__ = [
     "Participant",

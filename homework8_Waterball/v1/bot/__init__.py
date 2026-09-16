@@ -1,5 +1,5 @@
-from homework8_Waterball.v1.bot.bot import Bot
-from homework8_Waterball.v1.bot.commands import (
+from .bot import Bot
+from .commands import (
     AbstractBotCommand,
     BotCommand,
     KingCommand,
@@ -8,8 +8,8 @@ from homework8_Waterball.v1.bot.commands import (
     RecordCommand,
     StopRecordingCommand,
 )
-from homework8_Waterball.v1.bot.facade import BotFacade
-from homework8_Waterball.v1.bot.states import (
+from .facade import BotFacade
+from .states import (
     DefaultConversationState,
     InteractingState,
     IsBroadcastingGuard,

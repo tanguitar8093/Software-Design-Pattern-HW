@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, List
-from homework8_Waterball.v1.common.enums import CommunityEventType
+from .enums import CommunityEventType
 
 
 class CommunityEvent(ABC):

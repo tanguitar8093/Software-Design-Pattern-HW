@@ -10,7 +10,7 @@ def test_knowledge_king_with_clear_winner_and_chat_announcement_if_broadcasting(
     3. 若結算時「已有成員正在廣播」，機器人改透過「聊天室訊息」公布遊戲結果，而非廣播。
     4. 結算後經過 20 秒，知識王結束返回正常狀態。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -87,7 +87,7 @@ def test_knowledge_king_one_hour_timeout_settlement():
     「若在 1 小時之後，這 3 題尚未全部答完，那麼也會立即中斷且進入感謝參與狀態。」
     若此時無人廣播，透過語音廣播公布結果。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -136,7 +136,7 @@ def test_knowledge_king_play_again_command():
     機器人在聊天室傳遞：KnowledgeKing is gonna start again!，
     並重開遊戲、出第 0 題。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 20}',
@@ -184,7 +184,7 @@ def test_knowledge_king_king_stop_command():
     管理員下達 king-stop @bot，立即中斷知識王遊戲返回正常狀態。
     若非管理員下達則靜默失敗。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',

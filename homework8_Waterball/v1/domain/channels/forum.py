@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
-from homework8_Waterball.v1.common.events import PostPublishedEvent
-from homework8_Waterball.v1.common.observer import Observable
+from ...common.events import PostPublishedEvent
+from ...common.observer import Observable
 
 
 class Comment:

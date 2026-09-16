@@ -12,7 +12,7 @@ def test_default_conversation_three_message_cycle():
        第 4 則：回到第 1 則 good to hear @<發送者>
     2. 驗證標記發送者格式正確。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -45,7 +45,7 @@ def test_default_conversation_post_comment():
     當成員在論壇發布貼文時，機器人在該貼文底下留言：
     🤖 comment in post <post id>: Nice post @<發文者Id>
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -71,7 +71,7 @@ def test_transition_to_interacting_and_two_message_cycle():
        第 2 則：I like your idea! @<發送者>
        第 3 則：循環回到 Hi hi😁 @<發送者>
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -109,7 +109,7 @@ def test_interacting_post_comment_tags_all_online_participants():
     🤖 comment in post <post id>: How do you guys think about it? @bot, @<登入者1>, @<登入者2>...
     標記順序規定：@bot 在最前，其餘依成員登入順序排列。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',
@@ -141,7 +141,7 @@ def test_logout_switches_back_to_default_and_resets_cycle():
     測試成員登出使在線人數 < 10 人時，切換回「預設對話狀態」，
     並驗證「重新返回預設對話狀態時，會重置從第一則 good to hear 開始回覆」。
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [
         '[started] {"time": "2023-08-07 00:00:00", "quota": 10}',

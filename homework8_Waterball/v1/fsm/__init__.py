@@ -1,6 +1,6 @@
-from homework8_Waterball.v1.fsm.engine import FiniteStateMachine
-from homework8_Waterball.v1.fsm.state import AtomicState, CompositeState, State
-from homework8_Waterball.v1.fsm.transition import (
+from .engine import FiniteStateMachine
+from .state import AtomicState, CompositeState, State
+from .transition import (
     Action,
     Guard,
     Transition,

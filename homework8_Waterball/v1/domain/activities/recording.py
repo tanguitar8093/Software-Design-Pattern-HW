@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List
-from homework8_Waterball.v1.domain.channels.broadcast import VoiceMessage
+from ..channels.broadcast import VoiceMessage
 
 
 class RecordingSession:

@@ -109,7 +109,7 @@ def test_readme_official_example_e2e():
     5. 錄音者發送 stop-recording @bot -> 結束錄音返回正常
     6. 成員登出使人數小於 10 人 -> 切換回預設對話狀態，輪播重置為第一則
     """
-    from homework8_Waterball.main import run_simulation
+    from main import run_simulation
 
     input_lines = [line for line in README_INPUT.strip().split("\n") if line.strip()]
     expected_lines = [line for line in README_EXPECTED_OUTPUT.strip().split("\n")]

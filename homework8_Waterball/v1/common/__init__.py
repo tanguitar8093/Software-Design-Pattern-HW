@@ -1,5 +1,5 @@
-from homework8_Waterball.v1.common.enums import CommunityEventType, Role
-from homework8_Waterball.v1.common.events import (
+from .enums import CommunityEventType, Role
+from .events import (
     BroadcastStartedEvent,
     BroadcastStoppedEvent,
     CommunityEvent,
@@ -9,7 +9,7 @@ from homework8_Waterball.v1.common.events import (
     TimeElapsedEvent,
     VoiceSpokenEvent,
 )
-from homework8_Waterball.v1.common.observer import CommunityObserver, Observable
+from .observer import CommunityObserver, Observable
 
 __all__ = [
     "Role",

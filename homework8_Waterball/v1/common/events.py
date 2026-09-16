@@ -1,12 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from homework8_Waterball.v1.common.enums import CommunityEventType
-from homework8_Waterball.v1.common.observer import CommunityEvent
+from .enums import CommunityEventType
+from .observer import CommunityEvent
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.domain.channels.broadcast import VoiceMessage
-    from homework8_Waterball.v1.domain.channels.chat_room import Message
-    from homework8_Waterball.v1.domain.channels.forum import Post
+    from ..domain.channels.broadcast import VoiceMessage
+    from ..domain.channels.chat_room import Message
+    from ..domain.channels.forum import Post
 
 
 class MessageReceivedEvent(CommunityEvent):

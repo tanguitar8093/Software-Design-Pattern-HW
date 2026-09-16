@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from homework8_Waterball.v1.common.observer import CommunityEvent, CommunityObserver
-from homework8_Waterball.v1.domain.channels import Message, Post, VoiceMessage
-from homework8_Waterball.v1.domain.community import WaterballCommunity
-from homework8_Waterball.v1.domain.member import Participant
-from homework8_Waterball.v1.fsm import FiniteStateMachine, Trigger
+from ..common.observer import CommunityEvent, CommunityObserver
+from ..domain.channels import Message, Post, VoiceMessage
+from ..domain.community import WaterballCommunity
+from ..domain.member import Participant
+from ..fsm import FiniteStateMachine, Trigger
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.bot.commands import BotCommand
+    from .commands import BotCommand
 
 
 class Bot(Participant, CommunityObserver):
@@ -96,7 +96,7 @@ class Bot(Participant, CommunityObserver):
 
     def commentPost(self, postId: str, content: str, tags: Optional[List[str]] = None) -> None:
         if self._community is not None:
-            from homework8_Waterball.v1.domain.channels import Comment
+            from ..domain.channels import Comment
             comment = Comment("bot", content, tags)
             self._community.forum.addComment(postId, comment)
 

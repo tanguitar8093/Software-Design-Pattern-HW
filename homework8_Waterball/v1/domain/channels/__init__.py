@@ -1,6 +1,6 @@
-from homework8_Waterball.v1.domain.channels.broadcast import Broadcast, VoiceMessage
-from homework8_Waterball.v1.domain.channels.chat_room import ChatRoom, Message
-from homework8_Waterball.v1.domain.channels.forum import Comment, Forum, Post
+from .broadcast import Broadcast, VoiceMessage
+from .chat_room import ChatRoom, Message
+from .forum import Comment, Forum, Post
 
 __all__ = [
     "ChatRoom",
