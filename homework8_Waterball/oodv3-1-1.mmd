@@ -1,0 +1,156 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v3-1-1：社群機器人指令模式與樣板方法模式重點圖
+    %% 聚焦在 Bot 模組中的指令封裝、權限額度檢查管線與接收者協作：
+    %%   1. 指令模式 (Command Pattern)：Bot 作為 Invoker，解耦指令與具體業務 Receiver
+    %%   2. 樣板方法模式 (Template Method Pattern)：固化指令驗證執行管線
+    %%   3. 註解一律使用 <br/> 支援換行渲染
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 調用者 (Invoker)
+    %% ------------------------------------------------
+    class Bot {
+        <<Invoker Client>>
+        +quota: int
+        -commands: Map~String, BotCommand~
+        -rootFsm: FiniteStateMachine
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(name: String, member: Member, msg: Message) bool
+        +onMessageReceived(message: Message) void
+        +replyChatMessage(content: String, tags: List~String~) void
+    }
+
+    %% ------------------------------------------------
+    %% 指令介面與樣板方法 (Command & Template Method)
+    %% ------------------------------------------------
+    class BotCommand {
+        <<interface, Command>>
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+
+    class AbstractBotCommand {
+        <<abstract, Template Method>>
+        +requiredQuota: int
+        +requiredRole: Role
+        +execute(bot: Bot, member: Member, message: Message) bool
+        #checkQuota(bot: Bot) bool
+        #checkPermission(member: Member) bool
+        #deductQuota(bot: Bot) void
+        #doExecute(bot: Bot, member: Member, message: Message) bool*
+    }
+
+    %% ------------------------------------------------
+    %% 具體指令 (Concrete Commands)
+    %% ------------------------------------------------
+    class KingCommand {
+        <<Concrete Command>>
+        +requiredQuota: int = 5
+        +requiredRole: Role = ADMIN
+        #doExecute(bot, member, msg) bool
+    }
+
+    class RecordCommand {
+        <<Concrete Command>>
+        +requiredQuota: int = 3
+        +requiredRole: Role = MEMBER
+        #doExecute(bot, member, msg) bool
+    }
+
+    class StopRecordingCommand {
+        <<Concrete Command>>
+        +requiredQuota: int = 0
+        +requiredRole: Role = MEMBER
+        #checkPermission(member) bool
+        #doExecute(bot, member, msg) bool
+    }
+
+    class KingStopCommand {
+        <<Concrete Command>>
+        +requiredQuota: int = 0
+        +requiredRole: Role = ADMIN
+        #doExecute(bot, member, msg) bool
+    }
+
+    class PlayAgainCommand {
+        <<Concrete Command>>
+        +requiredQuota: int = 5
+        +requiredRole: Role = MEMBER
+        #doExecute(bot, member, msg) bool
+    }
+
+    %% ------------------------------------------------
+    %% 接收者群 (Receivers)
+    %% ------------------------------------------------
+    class RecordingSession {
+        <<Receiver>>
+        +recorderId: String
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        <<Receiver>>
+        +getCurrentQuestion() Question
+    }
+
+    class FiniteStateMachine {
+        <<Receiver / FSM Engine>>
+        +fire(trigger: Trigger) bool
+    }
+
+    class Member {
+        +role: Role
+        +id: String
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    %% ------------------------------------------------
+    %% 關聯與繼承
+    %% ------------------------------------------------
+    Bot "1" o-- "0..*" BotCommand : commands (Invoker holds Commands)
+    BotCommand <|.. AbstractBotCommand : implements
+    AbstractBotCommand <|-- KingCommand
+    AbstractBotCommand <|-- RecordCommand
+    AbstractBotCommand <|-- StopRecordingCommand
+    AbstractBotCommand <|-- KingStopCommand
+    AbstractBotCommand <|-- PlayAgainCommand
+
+    %% Command 協作 Receiver
+    KingCommand ..> KnowledgeKingGame : creates & starts
+    KingCommand ..> FiniteStateMachine : fires Trigger("king")
+    RecordCommand ..> RecordingSession : creates RecordingSession(recorderId)
+    RecordCommand ..> FiniteStateMachine : fires Trigger("record")
+    StopRecordingCommand ..> RecordingSession : checks recorder & gets replay
+    StopRecordingCommand ..> FiniteStateMachine : fires Trigger("stop-recording")
+    KingStopCommand ..> FiniteStateMachine : fires Trigger("king-stop")
+    PlayAgainCommand ..> KnowledgeKingGame : restarts game
+    PlayAgainCommand ..> FiniteStateMachine : fires Trigger("play again")
+
+    %% 指令發起者與參數依賴
+    Member ..> Bot : issues command via @bot
+    Member "1" --> "0..*" Message : sends
+    Bot ..> Message : onMessageReceived
+    AbstractBotCommand ..> Member : checkPermission(member)
+    AbstractBotCommand ..> Message : context in execute()
+    Member --> Role
+
+    %% ------------------------------------------------
+    %% 設計說明 Notes
+    %% ------------------------------------------------
+    note for AbstractBotCommand "【Template Method: 固化指令前置驗證管線】<br/>execute() 演算法骨架固定為：<br/>1. checkQuota(bot)：若 quota不足，靜默返回 false<br/>2. checkPermission(member)：若非管理員/非錄音者，靜默返回 false<br/>3. deductQuota(bot)：bot.quota -= requiredQuota<br/>4. doExecute(bot, member, msg)：延遲至具體子類別實現<br/>統一管理靜默失敗政策，保證前置順序絕對一致！"
+
+    note for BotCommand "【Command Pattern: 解耦 Invoker 與 Receiver】<br/>Bot 收到標記訊息時，只需根據指令名稱自 Map 取得 BotCommand，<br/>並呼叫 command.execute(bot, member, msg)。<br/>Bot 完全不需要知道各指令背後操作的是 RecordingSession、<br/>KnowledgeKingGame 還是 FSM 轉移，新增指令完全符合 OCP。"
+
+    note for StopRecordingCommand "【特殊權限覆寫】<br/>覆寫 checkPermission(member)：<br/>額外比對 member.id 是否等於當前 session.recorderId，<br/>滿足只有錄音者能結束錄音之需求。"
