@@ -1,0 +1,302 @@
+classDiagram
+    direction TB
+
+    %% ================================================================
+    %% OOD v1-2：全域整合圖
+    %% OOA 領域 + Push Observer（具型別事件）+ Bot 專用 State
+    %% State 可按需 Pull WaterballCommunity 的既有 Query FN。
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 社群領域：沿用 OOA-Clean 的類別與既有 FN
+    %% ------------------------------------------------
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    %% ------------------------------------------------
+    %% Observer：Push Model
+    %% 四個既有事件來源復用為 Concrete Subject，不新增包裝類別。
+    %% ------------------------------------------------
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class CommunityEvent {
+        <<interface, Event Contract>>
+    }
+
+    class MessageReceivedEvent {
+        +message: Message
+    }
+    class PostPublishedEvent {
+        +post: Post
+    }
+    class BroadcastStartedEvent {
+        +speakerId: String
+    }
+    class VoiceSpokenEvent {
+        +voiceMessage: VoiceMessage
+    }
+    class BroadcastStoppedEvent {
+        +speakerId: String
+    }
+    class TimeElapsedEvent {
+        +seconds: int
+    }
+
+    %% ------------------------------------------------
+    %% State：Bot 是 Context；所有 OOA onXxx FN 同名委派給 State。
+    %% ------------------------------------------------
+    class State {
+        <<interface>>
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class NormalState {
+        <<Concrete State>>
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class RecordState {
+        <<Concrete State>>
+        -session: RecordingSession
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class KnowledgeKingState {
+        <<Concrete State>>
+        -game: KnowledgeKingGame
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class Bot {
+        <<Concrete Observer + State Context>>
+        +id: String = "bot"
+        +quota: int
+        +replyCycleIndex: int
+        -currentState: State
+        +update(event: CommunityEvent) void
+        +changeState(nextState: State) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStarted(speakerId: String) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+        +resetReplyCycle() void
+        +getNextReplyMessage() String
+    }
+
+    %% ------------------------------------------------
+    %% OOA 原有結構
+    %% ------------------------------------------------
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+    WaterballCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterballCommunity "1" *-- "1" Forum : 擁有
+    WaterballCommunity "1" *-- "1" Broadcast : 擁有
+    WaterballCommunity "1" *-- "1" Bot : 常駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+
+    %% ------------------------------------------------
+    %% Push Observer 關係
+    %% ------------------------------------------------
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    Observable ..> CommunityEvent : push / notify(event)
+    CommunityObserver ..> CommunityEvent : receive / update(event)
+    Bot ..> Observable : registered to
+
+    CommunityEvent <|.. MessageReceivedEvent
+    CommunityEvent <|.. PostPublishedEvent
+    CommunityEvent <|.. BroadcastStartedEvent
+    CommunityEvent <|.. VoiceSpokenEvent
+    CommunityEvent <|.. BroadcastStoppedEvent
+    CommunityEvent <|.. TimeElapsedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+
+    %% ------------------------------------------------
+    %% State 關係 + 按需 Pull
+    %% ------------------------------------------------
+    Bot "1" --> "1" State : currentState / delegate
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+    RecordState "1" o-- "0..1" RecordingSession : 錄音活動
+    KnowledgeKingState "1" o-- "0..1" KnowledgeKingGame : 知識王活動
+
+    NormalState ..> WaterballCommunity : pull getOnlineCount()\ngetOnlineParticipants()
+    KnowledgeKingState ..> WaterballCommunity : pull currentTime
+    KnowledgeKingState ..> Broadcast : pull isBroadcasting()
+
+    %% Bot 主動輸出使用 OOA 已有的操作。
+    Bot --> ChatRoom : replyChatMessage()
+    Bot --> Forum : commentPost()
+    Bot --> Broadcast : broadcastVoice()
+
+    note for CommunityObserver "【Push Model】\nSubject 將必要資料包成具型別 CommunityEvent，\n統一呼叫 update(event)。Bot.update() 依 Event 型別\n轉派至 OOA 保留的 onXxx() FN。"
+    note for CommunityEvent "【Event Contract：為何可共同實作】\n每個子類別都是『社群中已發生、可被通知』的事件，\n所以都能作為 Observable.notify(event) 與\nCommunityObserver.update(event) 的統一參數。\n共同點是可被傳遞；共同資料不存在，因此不強加欄位。\n各子類別封裝自己的必要事實，Bot 依型別轉派至\n對應既有 FN：Message→onMessageReceived、Post→onPostPublished、\nStart/Voice/Stop→onBroadcastXxx、Time→onTimeElapsed。"
+    note for WaterballCommunity "【按需 Pull】\nState 僅在處理事件時需要在線人數、名單或時間，\n才呼叫既有 Query FN；這不是第二套 Observer。"
+    note for State "【v1 邊界】\n目前只有主 State；Normal / Record / KnowledgeKing\n內部子階段尚未抽出，是後續 FSM／Composite 的 force。"

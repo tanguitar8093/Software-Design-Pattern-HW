@@ -1,0 +1,153 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v1-1-3：Push Observer + 按需 Pull 的精簡類別圖
+    %% ================================================================
+
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class ChatRoom {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +postMessage(message: Message) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Forum {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +createPost(post: Post) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Broadcast {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class WaterballCommunity {
+        <<Concrete Subject + Query Provider>>
+        -observers: List~CommunityObserver~
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineCount() int
+        +getOnlineParticipants() List~Participant~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityEvent {
+        <<interface, Event Contract>>
+    }
+    class MessageReceivedEvent {
+        +message: Message
+    }
+    class PostPublishedEvent {
+        +post: Post
+    }
+    class BroadcastStartedEvent {
+        +speakerId: String
+    }
+    class VoiceSpokenEvent {
+        +voiceMessage: VoiceMessage
+    }
+    class BroadcastStoppedEvent {
+        +speakerId: String
+    }
+    class TimeElapsedEvent {
+        +seconds: int
+    }
+
+    class Bot {
+        <<Concrete Observer + State Context>>
+        -currentState: State
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+    }
+
+    class State {
+        <<interface>>
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class NormalState {
+        <<Concrete State>>
+    }
+    class RecordState {
+        <<Concrete State>>
+    }
+    class KnowledgeKingState {
+        <<Concrete State>>
+    }
+
+    class Message
+    class Post
+    class VoiceMessage
+
+    %% Push：所有 Subject 都以同一個 event 介面通知所有 Observer。
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    Observable ..> CommunityEvent : push / notify(event)
+    CommunityObserver ..> CommunityEvent : receive / update(event)
+
+    %% 強型別事件資料。
+    CommunityEvent <|.. MessageReceivedEvent
+    CommunityEvent <|.. PostPublishedEvent
+    CommunityEvent <|.. BroadcastStartedEvent
+    CommunityEvent <|.. VoiceSpokenEvent
+    CommunityEvent <|.. BroadcastStoppedEvent
+    CommunityEvent <|.. TimeElapsedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+
+    %% State：Bot 將既有 onXxx() 委派目前 State。
+    Bot "1" --> "1" State : currentState / delegate
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+
+    %% Pull：不是 Observer 介面；State 僅在需要時使用既有查詢 FN。
+    NormalState ..> WaterballCommunity : pull getOnlineCount()\ngetOnlineParticipants()
+    KnowledgeKingState ..> WaterballCommunity : pull currentTime
+
+    note for CommunityObserver "【Push】Subject 將必要事件資料包進 CommunityEvent，\n統一呼叫所有 Observer.update(event)。"
+    note for CommunityEvent "【Event Contract】\n每個子類別都是一次『社群中已發生且可通知』的事件；\n因此都能統一作為 notify(event) / update(event) 的參數。\n共同點是可被傳遞，事件資料則由各子類別封裝。"
+    note for WaterballCommunity "【Pull】State 處理事件時，只有需要在線人數、\n名單或目前時間，才呼叫既有 Query FN。\n這不是另一套 Observer。"

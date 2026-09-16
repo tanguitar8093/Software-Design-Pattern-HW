@@ -1,0 +1,260 @@
+classDiagram
+    direction TB
+
+    %% 此圖以 OOD.mmd 為基底：保留社群領域、Bot 模組、Command 與應用層。
+    %% 唯一抽離的是 FSM 的內部結構；詳情移至 FSM-2.mmd。
+
+    %% ================================================================
+    %% 【第一層：社群領域層 Waterball Community Domain】
+    %% ================================================================
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+    }
+
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+        +subscribe(observer: CommunityObserver) void
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        +subscribe(observer: CommunityObserver) void
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        +subscribe(observer: CommunityObserver) void
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+        +subscribe(observer: CommunityObserver) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    Participant <|-- Member
+    Member --> Role
+    WaterballCommunity "1" *-- "1" ChatRoom
+    WaterballCommunity "1" *-- "1" Forum
+    WaterballCommunity "1" *-- "1" Broadcast
+    WaterballCommunity "1" *-- "1" Bot : 常駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線名單
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+
+    ChatRoom ..> CommunityObserver : notify (收到訊息)
+    Forum ..> CommunityObserver : notify (發布貼文)
+    Broadcast ..> CommunityObserver : notify (上麥/發言/下麥)
+    WaterballCommunity ..> CommunityObserver : notify (時間流逝)
+
+    %% ================================================================
+    %% 【第二層：FSM 模組公開邊界】
+    %% OOD-2 只看見輸入、輸出與公開操作；內部結構見 FSM-2.mmd。
+    %% ================================================================
+    class FiniteStateMachine {
+        <<FSM module / black box>>
+        +fire(event: FsmEvent) DispatchResult
+        +getCurrentStateId() String
+    }
+
+    class FsmEvent {
+        <<input>>
+        +name: String
+        +payload: Map
+    }
+
+    class DispatchResult {
+        <<output>>
+        +handled: bool
+        +stateChanged: bool
+        +activeStateId: String
+    }
+
+    %% ================================================================
+    %% 【第三層：Bot 模組 Waterball Bot Module】
+    %% 保留 OOD.mmd 的 Facade、Command 與 Template Method 設計。
+    %% ================================================================
+    class BotFacade {
+        <<Facade>>
+        +state(name: String) BotFacade
+        +command(name: String, cmd: BotCommand) BotFacade
+        +transition(from: String, to: String, event: String) BotFacade
+        +build() Bot
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: int
+        +replyCycleIndex: int
+        -fsm: FiniteStateMachine
+        -commands: Map~String, BotCommand~
+        -recordingSession: RecordingSession
+        -knowledgeKingGame: KnowledgeKingGame
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(cmdName: String, member: Member) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+        +resetReplyCycle() void
+        +getNextReplyMessage() String
+    }
+
+    class BotCommand {
+        <<interface, Command>>
+        +execute(bot: Bot, member: Member) void
+    }
+
+    class AbstractBotCommand {
+        <<abstract, Template Method>>
+        +execute(bot: Bot, member: Member) void
+        #checkQuota(bot: Bot) bool
+        #checkPermission(member: Member) bool
+        #deductQuota(bot: Bot) void
+        #doExecute(bot: Bot, member: Member)* void
+    }
+
+    class KingCommand
+    class RecordCommand
+    class StopRecordingCommand
+    class KingStopCommand
+    class PlayAgainCommand
+
+    Participant <|-- Bot
+    CommunityObserver <|.. Bot : 監聽社群事件
+    Bot "1" *-- "1" FiniteStateMachine : 僅透過公開 API 驅動
+    Bot "1" o-- "0..*" BotCommand : 註冊與持有指令集合 (Invoker)
+    Bot "1" o-- "0..1" RecordingSession : 錄音期間
+    Bot "1" o-- "0..1" KnowledgeKingGame : 遊戲期間
+    Bot ..> FsmEvent : 將社群事件轉為 FSM 輸入
+    FiniteStateMachine ..> FsmEvent : input
+    FiniteStateMachine --> DispatchResult : output
+    BotFacade ..> Bot : build()
+    BotFacade ..> BotCommand : 註冊指令設定
+    BotFacade ..> FiniteStateMachine : 組裝、注入但不暴露內部類別
+
+    BotCommand <|.. AbstractBotCommand
+    AbstractBotCommand <|-- KingCommand
+    AbstractBotCommand <|-- RecordCommand
+    AbstractBotCommand <|-- StopRecordingCommand
+    AbstractBotCommand <|-- KingStopCommand
+    AbstractBotCommand <|-- PlayAgainCommand
+
+    KingCommand ..> KnowledgeKingGame : 啟動遊戲 (Receiver)
+    KingCommand ..> FiniteStateMachine : fire(king)
+    RecordCommand ..> RecordingSession : 初始化錄音會話 (Receiver)
+    RecordCommand ..> FiniteStateMachine : fire(record)
+    StopRecordingCommand ..> RecordingSession : 產出 Replay
+    StopRecordingCommand ..> FiniteStateMachine : fire(stop-recording)
+    PlayAgainCommand ..> KnowledgeKingGame : 重啟遊戲
+    KingStopCommand ..> FiniteStateMachine : fire(king-stop)
+
+    %% ================================================================
+    %% 【第四層：應用層 Application Layer】
+    %% ================================================================
+    class Client {
+        +main() void
+    }
+
+    Client --> WaterballCommunity : 驅動生命週期與時間
+    Client --> Member : 觸發發言/發文/廣播
+    Client --> BotFacade : 宣告配置機器人
+
+    note for FiniteStateMachine "FSM 是獨立模組。此圖只描述：\ninput = FsmEvent；output = DispatchResult。\nState、Transition、Guard、Action 與子狀態機\n全部封裝於 FSM-2.mmd。"
+    note for BotFacade "【Facade】保留 OOD.mmd 的高階設定語法。\nBot module 在內部組裝 FSM；Application Layer\n不需依賴 FSM 的任何內部型別。"
+    note for AbstractBotCommand "【Template Method & Command】\n驗證 Quota → 驗證權限 → 扣除 Quota → doExecute()。"

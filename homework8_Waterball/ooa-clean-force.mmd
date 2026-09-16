@@ -1,0 +1,55 @@
+flowchart TB
+    %% ================================================================
+    %% OOA-Clean 的 Force Map（套用模式前）
+    %%
+    %% 圖上只使用 OOA-Clean 已存在的類別。
+    %% Force 箭頭收斂於 Bot，表示壓力集中在 Bot 的既有責任；
+    %% FSM、State、Transition、Command 等均是後續 Resulting Context，
+    %% 不應畫成這張 OOA force 圖的箭頭終點。
+    %% ================================================================
+
+    subgraph StateForces[State Pattern：force 交會於既有 Bot]
+        direction LR
+        ChatRoom_S[ChatRoom] -->|F-S1：訊息事件要依 Bot 當下情況採不同反應| Bot_S[Bot]
+        Broadcast_S[Broadcast] -->|F-S2：語音事件要依 Bot 當下情況採不同反應| Bot_S
+        Community_S[WaterballCommunity] -->|F-S3：時間／在線人數變化會改變 Bot 行為| Bot_S
+    end
+
+    subgraph CompositeForces[Composite Pattern：force 交會於既有 Bot]
+        direction LR
+        Recording_C[RecordingSession] -->|F-C1：錄音活動本身有等待／錄音中的階段性行為| Bot_C[Bot]
+        Game_C[KnowledgeKingGame] -->|F-C2：知識王活動本身有出題／致謝的階段性行為| Bot_C
+    end
+
+    subgraph ObserverForces[Observer Pattern：force 交會於既有 Bot]
+        direction LR
+        ChatRoom_O[ChatRoom] -->|F-O1：新訊息發生後需要通知 Bot| Bot_O[Bot]
+        Forum_O[Forum] -->|F-O2：新貼文發生後需要通知 Bot| Bot_O
+        Broadcast_O[Broadcast] -->|F-O3：上麥／說話／下麥後需要通知 Bot| Bot_O
+        Community_O[WaterballCommunity] -->|F-O4：時間流逝後需要通知 Bot| Bot_O
+    end
+
+    subgraph CommandForces[Command Pattern：force 交會於既有 Bot]
+        direction LR
+        Message_M[Message] -->|F-M1：同一訊息輸入可能代表不同指令行為| Bot_M[Bot]
+        Recording_M[RecordingSession] -->|F-M2：錄音指令需要不同的 Receiver 協作| Bot_M
+        Game_M[KnowledgeKingGame] -->|F-M3：知識王指令需要不同的 Receiver 協作| Bot_M
+    end
+
+    subgraph StrategyForces[Strategy Pattern：force 交會於既有 Bot]
+        direction LR
+        Member_G[Member] -->|F-G1：角色／錄音者身分影響是否能執行行為| Bot_G[Bot]
+        Community_G[WaterballCommunity] -->|F-G2：在線人數影響行為與狀態切換| Bot_G
+        Message_G[Message] -->|F-G3：標記 Bot 的指令受共享額度限制| Bot_G
+        ChatRoom_G[ChatRoom] -->|F-G4：回到對話情境時需重設輪播副作用| Bot_G
+    end
+
+    subgraph TemplateForces[Template Method：force 交會於既有 Bot]
+        direction LR
+        Member_T[Member] -->|F-T1：各指令都須驗證發令者權限／身分| Bot_T[Bot]
+        Message_T[Message] -->|F-T2：各指令都須檢查並可能扣除共享額度| Bot_T
+        Recording_T[RecordingSession] -->|F-T3：錄音指令的最後業務動作不同| Bot_T
+        Game_T[KnowledgeKingGame] -->|F-T4：知識王指令的最後業務動作不同| Bot_T
+    end
+
+    note1[Facade 不在本圖：README 的設計需求 2 是在 FSM module 已經設計完成後，\n才因 Client 不應理解 FSM 複雜性而推導 BotFacade。]

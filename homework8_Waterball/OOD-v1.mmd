@@ -1,0 +1,287 @@
+classDiagram
+    direction TB
+
+    %% ================================================================
+    %% OOD v1
+    %% 從 OOA-Clean 的第一輪 forces 套用兩個模式：
+    %%   1. Observer：四個既有事件來源與 Bot 解耦
+    %%   2. State：Bot 的既有 onXxx FN 依目前 State 多型委派
+    %% 本版不含通用 FSM、Transition、Guard/Action、Composite、
+    %% Command、Template Method、Facade。
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% OOA 既有領域類別與 FN
+    %% ------------------------------------------------
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    %% ------------------------------------------------
+    %% v1 Observer Pattern
+    %% 所有 Observer 都以同一個 update(event) 接收通知。
+    %% CommunityObserver 不再放六個彼此不同的回呼 FN。
+    %% ------------------------------------------------
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class CommunityEvent {
+        +type: CommunityEventType
+        +payload: Object
+    }
+
+    class CommunityEventType {
+        <<enumeration>>
+        MESSAGE_RECEIVED
+        POST_PUBLISHED
+        BROADCAST_STARTED
+        VOICE_SPOKEN
+        BROADCAST_STOPPED
+        TIME_ELAPSED
+    }
+
+    %% ------------------------------------------------
+    %% v1 State Pattern
+    %% Bot 的既有 onXxx() 是 Context operations。
+    %% State 與每個 ConcreteState 都實作同名操作；
+    %% Bot 的 onXxx() 只將工作委派給 currentState。
+    %% ------------------------------------------------
+    class State {
+        <<interface>>
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class NormalState {
+        <<Concrete State>>
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class RecordState {
+        <<Concrete State>>
+        -session: RecordingSession
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class KnowledgeKingState {
+        <<Concrete State>>
+        -game: KnowledgeKingGame
+        +onEnter(bot: Bot) void
+        +onExit(bot: Bot) void
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: int
+        +replyCycleIndex: int
+        -currentState: State
+        +update(event: CommunityEvent) void
+        +changeState(nextState: State) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStarted(speakerId: String) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+        +resetReplyCycle() void
+        +getNextReplyMessage() String
+    }
+
+    %% ------------------------------------------------
+    %% OOA 既有結構
+    %% ------------------------------------------------
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+
+    WaterballCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterballCommunity "1" *-- "1" Forum : 擁有
+    WaterballCommunity "1" *-- "1" Broadcast : 擁有
+    WaterballCommunity "1" *-- "1" Bot : 常駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+
+    %% ------------------------------------------------
+    %% Observer 結構：既有四個事件來源直接實作 Observable；
+    %% v1 只有 Bot 是 Concrete Observer，故不憑空新增假 Observer。
+    %% ------------------------------------------------
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    CommunityEvent --> CommunityEventType
+    Observable ..> CommunityEvent : notify(event)
+    CommunityObserver ..> CommunityEvent : update(event)
+
+    %% ------------------------------------------------
+    %% State 結構：Context 的既有 FN 與 State 的同名 FN 一對一。
+    %% ------------------------------------------------
+    Bot "1" --> "1" State : currentState
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+    RecordState "1" o-- "0..1" RecordingSession : 錄音活動
+    KnowledgeKingState "1" o-- "0..1" KnowledgeKingGame : 知識王活動
+
+    %% Bot 仍保留 OOA 的主動輸出協作；事件輸入則統一經 update(event)。
+    Bot --> ChatRoom : replyChatMessage()
+    Bot --> Forum : commentPost()
+    Bot --> Broadcast : broadcastVoice()
+
+    note for CommunityObserver "【Observer v1】\n四個 Subject 的不同領域事件先包成 CommunityEvent，\n所有 Observer 都只實作同一個 update(event)。\nBot.update() 再依 event.type 轉派至保留的 onXxx() FN。"
+    note for State "【State v1】\nBot 的 onMessageReceived、onPostPublished、\nonBroadcastStarted、onVoiceSpoken、\nonBroadcastStopped、onTimeElapsed 都是 Context operations。\n每個 ConcreteState 以同名 FN 實作不同狀態行為。"
+    note for Bot "【v1 範圍】\n新增的模式 FN：Observable.register / unregister / notify、\nCommunityObserver.update、Bot.changeState、State.onEnter / onExit。\nOOA 原有的 Bot onXxx() 與輸出 FN 均保留，不改名。\n本版尚未抽通用 FSM 或子狀態機。"

@@ -1,0 +1,105 @@
+classDiagram
+    direction TB
+
+    %% 從 OOD.mmd 抽出的 FSM 模組內部設計。
+    %% 本圖刻意不出現 Bot、Member、Role 或任何 Waterball 社群領域類別。
+
+    class FiniteStateMachine {
+        <<public API>>
+        +initialState: State
+        +currentState: State
+        +transitions: List~Transition~
+        +fire(event: FsmEvent) DispatchResult
+        +getCurrentStateId() String
+    }
+
+    class FsmEvent {
+        <<input>>
+        +name: String
+        +payload: Map
+    }
+
+    class DispatchResult {
+        <<output>>
+        +handled: bool
+        +stateChanged: bool
+        +activeStateId: String
+    }
+
+    class FsmContext {
+        +event: FsmEvent
+        +fsm: FiniteStateMachine
+        +attributes: Map
+    }
+
+    %% State Pattern + Composite Pattern
+    class State {
+        <<interface, Composite Component>>
+        +onEnter(context: FsmContext) void
+        +onExit(context: FsmContext) void
+        +handle(context: FsmContext) bool
+    }
+
+    class AtomicState {
+        <<abstract, Composite Leaf>>
+        +onEnter(context: FsmContext) void
+        +onExit(context: FsmContext) void
+        +handle(context: FsmContext) bool
+    }
+
+    class CompositeState {
+        <<plugin, Composite>>
+        +subFsm: FiniteStateMachine
+        +onEnter(context: FsmContext) void
+        +onExit(context: FsmContext) void
+        +handle(context: FsmContext) bool
+        +addState(state: State) void
+    }
+
+    State <|.. AtomicState
+    State <|.. CompositeState
+    CompositeState "1" *-- "1" FiniteStateMachine : 內嵌子狀態機（可遞迴）
+
+    %% Transition + Strategy Pattern
+    class Transition {
+        +fromState: State
+        +toState: State
+        +eventName: String
+        +guard: Guard
+        +action: Action
+        +trigger(context: FsmContext) bool
+        +isSatisfied(context: FsmContext) bool
+        +executeAction(context: FsmContext) void
+    }
+
+    class Guard {
+        <<interface, Strategy>>
+        +isSatisfied(context: FsmContext) bool
+    }
+
+    class Action {
+        <<interface, Strategy>>
+        +execute(context: FsmContext) void
+    }
+
+    FiniteStateMachine "1" o-- "1..*" State : 管理狀態集
+    FiniteStateMachine "1" *-- "0..*" Transition : 擁有轉移集合
+    FiniteStateMachine ..> FsmContext : 建立
+    FsmContext --> FsmEvent
+    Transition --> State : fromState / toState
+    Transition o-- "0..1" Guard : 守衛條件（由 Client 注入）
+    Transition o-- "0..1" Action : 轉移動作（由 Client 注入）
+
+    class FiniteStateMachineBuilder {
+        <<configuration API>>
+        +state(state: State) FiniteStateMachineBuilder
+        +transition(transition: Transition) FiniteStateMachineBuilder
+        +initial(state: State) FiniteStateMachineBuilder
+        +build() FiniteStateMachine
+    }
+
+    FiniteStateMachineBuilder ..> FiniteStateMachine : 組裝產出
+
+    note for FiniteStateMachine "fire(event) 的固定流程：\n1. 建立 FsmContext\n2. 子狀態機先嘗試 handle\n3. 篩選符合 Guard 的 Transition\n4. old.onExit → Action → new.onEnter\n5. 回傳 DispatchResult"
+    note for CompositeState "【子狀態機插件】它只實作 State。\nFiniteStateMachine 只依賴 State，因此\n加入或移除子狀態機功能時不用修改引擎。"
+    note for Guard "FSM 不知道業務語意。\n權限、額度、線上人數與回覆行為\n皆由 Client 以 Guard／Action 注入。"

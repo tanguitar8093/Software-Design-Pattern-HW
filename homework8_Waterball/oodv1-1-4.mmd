@@ -1,0 +1,170 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v1-1-4：Push Observer 的「受約束事件」類別圖
+    %% 修正 v1-1-3 的空 Event Contract：
+    %% 每一個事件都必須有既定 type，並能以既定方式 dispatch 給 Bot。
+    %% ================================================================
+
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class CommunityEventType {
+        <<enumeration>>
+        MESSAGE_RECEIVED
+        POST_PUBLISHED
+        BROADCAST_STARTED
+        VOICE_SPOKEN
+        BROADCAST_STOPPED
+        TIME_ELAPSED
+    }
+
+    class CommunityEvent {
+        <<abstract>>
+        +type: CommunityEventType
+        +dispatchTo(bot: Bot) void
+    }
+
+    class MessageReceivedEvent {
+        +type: CommunityEventType = MESSAGE_RECEIVED
+        +message: Message
+        +dispatchTo(bot: Bot) void
+    }
+    class PostPublishedEvent {
+        +type: CommunityEventType = POST_PUBLISHED
+        +post: Post
+        +dispatchTo(bot: Bot) void
+    }
+    class BroadcastStartedEvent {
+        +type: CommunityEventType = BROADCAST_STARTED
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+    class VoiceSpokenEvent {
+        +type: CommunityEventType = VOICE_SPOKEN
+        +voiceMessage: VoiceMessage
+        +dispatchTo(bot: Bot) void
+    }
+    class BroadcastStoppedEvent {
+        +type: CommunityEventType = BROADCAST_STOPPED
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+    class TimeElapsedEvent {
+        +type: CommunityEventType = TIME_ELAPSED
+        +seconds: int
+        +dispatchTo(bot: Bot) void
+    }
+
+    class ChatRoom {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +postMessage(message: Message) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+    class Forum {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +createPost(post: Post) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+    class Broadcast {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+    class WaterballCommunity {
+        <<Concrete Subject + Query Provider>>
+        -observers: List~CommunityObserver~
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineCount() int
+        +getOnlineParticipants() List~Participant~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Bot {
+        <<Concrete Observer + State Context>>
+        -currentState: State
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+    }
+
+    class State {
+        <<interface>>
+        +onMessageReceived(bot: Bot, message: Message) void
+        +onPostPublished(bot: Bot, post: Post) void
+        +onBroadcastStarted(bot: Bot, speakerId: String) void
+        +onVoiceSpoken(bot: Bot, voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(bot: Bot, speakerId: String) void
+        +onTimeElapsed(bot: Bot, seconds: int) void
+    }
+    class NormalState { <<Concrete State>> }
+    class RecordState { <<Concrete State>> }
+    class KnowledgeKingState { <<Concrete State>> }
+    class Message
+    class Post
+    class VoiceMessage
+
+    %% Subject 以單一事件參數 Push；Bot 以單一 update 接收。
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    Observable ..> CommunityEvent : notify(event)
+    CommunityObserver ..> CommunityEvent : update(event)
+
+    %% 事件基底的強制規格與具體事件的固定實作。
+    CommunityEvent --> CommunityEventType : fixed type
+    CommunityEvent <|-- MessageReceivedEvent
+    CommunityEvent <|-- PostPublishedEvent
+    CommunityEvent <|-- BroadcastStartedEvent
+    CommunityEvent <|-- VoiceSpokenEvent
+    CommunityEvent <|-- BroadcastStoppedEvent
+    CommunityEvent <|-- TimeElapsedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+    CommunityEvent ..> Bot : dispatchTo(bot)
+
+    %% dispatchTo 保留 OOA 既有 FN 名稱，再由 Bot 委派 State。
+    Bot "1" --> "1" State : currentState / delegate
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+
+    note for CommunityEvent "【不是空介面】\n任何事件都必須：\n1. 綁定 CommunityEventType 的一個既定值；\n2. 實作 dispatchTo(bot)。\n因此不能只帶任意 Object payload 就通知。"
+    note for MessageReceivedEvent "dispatchTo(bot)\n→ bot.onMessageReceived(message)"
+    note for PostPublishedEvent "dispatchTo(bot)\n→ bot.onPostPublished(post)"
+    note for BroadcastStartedEvent "dispatchTo(bot)\n→ bot.onBroadcastStarted(speakerId)"
+    note for VoiceSpokenEvent "dispatchTo(bot)\n→ bot.onVoiceSpoken(voiceMessage)"
+    note for BroadcastStoppedEvent "dispatchTo(bot)\n→ bot.onBroadcastStopped(speakerId)"
+    note for TimeElapsedEvent "dispatchTo(bot)\n→ bot.onTimeElapsed(seconds)"
+    note for Bot "update(event) 的實作固定為：\nevent.dispatchTo(this)；\nOOA 既有 onXxx() 再委派 currentState。"

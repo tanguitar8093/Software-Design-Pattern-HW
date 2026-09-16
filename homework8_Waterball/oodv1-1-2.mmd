@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor Member
+    participant ChatRoom as ChatRoom<br/>(Concrete Subject)
+    participant Bot as Bot<br/>(Concrete Observer / Context)
+    participant State as currentState<br/>(Concrete State)
+    participant Community as WaterballCommunity
+
+    Note over ChatRoom,Bot: Push：事件必要資料直接隨 CommunityEvent 傳遞
+    Member->>ChatRoom: sendMessage(...)
+    ChatRoom->>ChatRoom: postMessage(message)
+    ChatRoom->>Bot: update(MessageReceivedEvent(message))
+    Bot->>Bot: onMessageReceived(message)
+    Bot->>State: onMessageReceived(bot, message)
+
+    alt State 處理只需要訊息本身
+        State->>Bot: replyChatMessage(content, tags)
+        Bot->>ChatRoom: postMessage(botMessage)
+    else State 需要額外的即時領域狀態
+        Note over State,Community: Pull：只在需要時查詢既有 OOA FN
+        State->>Community: getOnlineCount()
+        Community-->>State: onlineCount
+        opt 需要標記所有在線參與者
+            State->>Community: getOnlineParticipants()
+            Community-->>State: participants
+        end
+        State->>Bot: commentPost(...) / replyChatMessage(...)
+    end
+
+    Note over ChatRoom,Community: Observer 仍只有 update(event) 一套通知機制；<br/>Pull 只是 State 處理事件時的正常領域查詢，不是第二套 Observer。

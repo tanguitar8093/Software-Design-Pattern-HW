@@ -1,0 +1,120 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v1：Observer Pattern Form（從 OOD-v1.mmd 抽出）
+    %% 採 Push Model：Subject 將具型別 CommunityEvent 推給 Observer。
+    %% ================================================================
+
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class ChatRoom {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +postMessage(message: Message) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Forum {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +createPost(post: Post) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Broadcast {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class WaterballCommunity {
+        <<Concrete Subject>>
+        -observers: List~CommunityObserver~
+        +elapseTime(amount: int, unit: String) void
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Bot {
+        <<Concrete Observer>>
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+    }
+
+    class CommunityEvent {
+        <<interface, Event Contract>>
+    }
+
+    class MessageReceivedEvent {
+        +message: Message
+    }
+    class PostPublishedEvent {
+        +post: Post
+    }
+    class BroadcastStartedEvent {
+        +speakerId: String
+    }
+    class VoiceSpokenEvent {
+        +voiceMessage: VoiceMessage
+    }
+    class BroadcastStoppedEvent {
+        +speakerId: String
+    }
+    class TimeElapsedEvent {
+        +seconds: int
+    }
+
+    class Message
+    class Post
+    class VoiceMessage
+
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+
+    CommunityEvent <|.. MessageReceivedEvent
+    CommunityEvent <|.. PostPublishedEvent
+    CommunityEvent <|.. BroadcastStartedEvent
+    CommunityEvent <|.. VoiceSpokenEvent
+    CommunityEvent <|.. BroadcastStoppedEvent
+    CommunityEvent <|.. TimeElapsedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+
+    Observable ..> CommunityEvent : push via notify(event)
+    CommunityObserver ..> CommunityEvent : receive via update(event)
+    Bot ..> Observable : registered to
+
+    note for CommunityObserver "【Push Model】\nSubject 將 CommunityEvent 直接推入 update(event)。\nBot 不必分別向 ChatRoom、Forum、Broadcast、\nWaterballCommunity 拉取不同型別的最新狀態。"
+    note for CommunityEvent "【Event Contract】\n子類別皆表示一次可通知的社群事件，\n因此可統一傳入 notify(event) / update(event)。\n共同點是可被傳遞，不是共同資料；\n資料由各具體 Event 自己封裝。"
+    note for Bot "Bot.update(event) 依具體 Event 型別，\n轉派到 OOA 保留的同名 onXxx() FN。"
