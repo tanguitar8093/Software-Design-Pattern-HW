@@ -115,4 +115,11 @@ def test_readme_official_example_e2e():
     expected_lines = [line for line in README_EXPECTED_OUTPUT.strip().split("\n")]
 
     actual_output = run_simulation(input_lines)
+
+    # 輸出過程至 stdout，供 pytest -s 查閱
+    print("\n" + "=" * 50 + " 實際輸出內容 " + "=" * 50)
+    for line in actual_output:
+        print(line)
+    print("=" * 114)
+
     assert actual_output == expected_lines

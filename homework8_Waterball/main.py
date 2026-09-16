@@ -1,5 +1,13 @@
 import json
+import sys
+from pathlib import Path
 from typing import List
+
+# 確保可以直接以 python main.py 執行時找到套件
+workspace_dir = Path(__file__).resolve().parent.parent
+if str(workspace_dir) not in sys.path:
+    sys.path.insert(0, str(workspace_dir))
+
 from homework8_Waterball.v1.bot import BotFacade
 from homework8_Waterball.v1.common import Role
 from homework8_Waterball.v1.domain import Member, Post, WaterballCommunity
@@ -104,3 +112,18 @@ def run_simulation(input_lines: List[str]) -> List[str]:
                     member.stopBroadcast(community.broadcast)
 
     return output_lines
+
+
+if __name__ == "__main__":
+    import sys
+
+    # 支援標準輸入（如 cat input.txt | python main.py）或指定檔案參數（python main.py input.txt）
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    else:
+        lines = sys.stdin.readlines()
+
+    results = run_simulation(lines)
+    for line in results:
+        print(line)
