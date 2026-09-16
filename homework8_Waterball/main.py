@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional
 
 # 確保可以直接以 python main.py 執行時找到套件
 workspace_dir = Path(__file__).resolve().parent.parent
@@ -13,222 +13,166 @@ from homework8_Waterball.v1.common import Role
 from homework8_Waterball.v1.domain import Member, Post, WaterballCommunity
 
 
-def run_simulation(input_lines: List[str]) -> List[str]:
+class CommunitySimulationDriver:
     """
-    應用層主模擬器：
-    讀取 JSON 格式事件串流，透過 BotFacade 建立機器人，驅動社群運作並回傳所有輸出行。
+    應用層事件驅動器 (Application Layer Driver / Input Adapter):
+    負責將 README 規範的 JSON 字串輸入，映射調用對應的領域頻道與 BotFacade。
+    使用 Handler 查表分派 (Dispatcher)，消除冗長且重複的 if-else 階梯。
     """
-    output_lines: List[str] = []
-    community: WaterballCommunity = None
-    bot = None
+    def __init__(self, output_sink: Optional[List[str]] = None):
+        self.output_sink: List[str] = output_sink if output_sink is not None else []
+        self.community: Optional[WaterballCommunity] = None
+        self.bot: Optional[Any] = None
 
-    for raw_line in input_lines:
+        # 事件名稱與對應處理函式對映表 (查表法符合 OCP)
+        self._handlers = {
+            "started": self._handle_started,
+            "login": self._handle_login,
+            "logout": self._handle_logout,
+            "new message": self._handle_new_message,
+            "new post": self._handle_new_post,
+            "go broadcasting": self._handle_go_broadcasting,
+            "speak": self._handle_speak,
+            "stop broadcasting": self._handle_stop_broadcasting,
+        }
+
+    def execute_line(self, raw_line: str) -> None:
         line = raw_line.strip()
-        if not line:
-            continue
-
-        if line == "[end]":
-            break
+        if not line or line == "[end]":
+            return
 
         # 1. 時間流逝事件：[<n> <time-unit> elapsed]
         if "elapsed" in line:
-            # 格式：[<n> <time-unit> elapsed]
-            inner = line[1:-1].strip()
-            parts = inner.split()
-            amount = int(parts[0])
-            unit = parts[1]
-            if community is not None:
-                community.elapseTime(amount, unit)
-            continue
+            self._handle_elapsed(line)
+            return
 
-        # 2. JSON 格式事件：[<event's name>] <payload in JSON format>
+        # 2. JSON 事件格式：[<event_name>] <payload>
         idx = line.find("]")
         if idx == -1:
-            continue
+            return
 
         event_name = line[1:idx].strip()
         payload_str = line[idx + 1:].strip()
         payload = json.loads(payload_str) if payload_str else {}
 
-        if event_name == "started":
-            initial_time = payload.get("time", "2023-08-07 00:00:00")
-            quota = payload.get("quota", 10)
-            community = WaterballCommunity(initialTime=initial_time, output_sink=output_lines)
-            facade = BotFacade.create(quota=quota)
-            bot = facade.buildDefaultBot(community)
+        handler = self._handlers.get(event_name)
+        if handler:
+            handler(payload)
 
-        elif event_name == "login":
-            user_id = str(payload.get("userId"))
-            is_admin = payload.get("isAdmin", False)
-            role = Role.ADMIN if is_admin else Role.MEMBER
-            member = Member(id=user_id, role=role)
-            if community is not None:
-                community.login(member)
+    def _handle_started(self, payload: dict) -> None:
+        initial_time = payload.get("time", "2023-08-07 00:00:00")
+        quota = payload.get("quota", 10)
+        self.community = WaterballCommunity(initialTime=initial_time, output_sink=self.output_sink)
+        facade = BotFacade.create(quota=quota)
+        self.bot = facade.buildDefaultBot(self.community)
 
-        elif event_name == "logout":
-            user_id = str(payload.get("userId"))
-            if community is not None:
-                community.logout(user_id)
+    def _handle_login(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        user_id = str(payload.get("userId"))
+        role = Role.ADMIN if payload.get("isAdmin", False) else Role.MEMBER
+        self.community.login(Member(id=user_id, role=role))
 
-        elif event_name == "new message":
-            author_id = str(payload.get("authorId"))
-            content = payload.get("content", "")
-            tags = payload.get("tags", [])
-            if community is not None:
-                member = community.getMember(author_id)
-                if member is not None:
-                    member.sendMessage(community.chatRoom, content, tags)
+    def _handle_logout(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        self.community.logout(str(payload.get("userId")))
 
-        elif event_name == "new post":
-            post_id = str(payload.get("id"))
-            author_id = str(payload.get("authorId"))
-            title = payload.get("title", "")
-            content = payload.get("content", "")
-            tags = payload.get("tags", [])
-            post = Post(id=post_id, authorId=author_id, title=title, content=content, tags=tags)
-            if community is not None:
-                community.forum.createPost(post)
+    def _handle_new_message(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        member = self.community.getMember(str(payload.get("authorId")))
+        if member is not None:
+            member.sendMessage(self.community.chatRoom, payload.get("content", ""), payload.get("tags", []))
 
-        elif event_name == "go broadcasting":
-            speaker_id = str(payload.get("speakerId"))
-            if community is not None:
-                member = community.getMember(speaker_id)
-                if member is not None:
-                    member.startBroadcast(community.broadcast)
+    def _handle_new_post(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        post = Post(
+            id=str(payload.get("id")),
+            authorId=str(payload.get("authorId")),
+            title=payload.get("title", ""),
+            content=payload.get("content", ""),
+            tags=payload.get("tags", []),
+        )
+        self.community.forum.createPost(post)
 
-        elif event_name == "speak":
-            speaker_id = str(payload.get("speakerId"))
-            content = payload.get("content", "")
-            if community is not None:
-                member = community.getMember(speaker_id)
-                if member is not None:
-                    member.speak(community.broadcast, content)
+    def _handle_go_broadcasting(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        member = self.community.getMember(str(payload.get("speakerId")))
+        if member is not None:
+            member.startBroadcast(self.community.broadcast)
 
-        elif event_name == "stop broadcasting":
-            speaker_id = str(payload.get("speakerId"))
-            if community is not None:
-                member = community.getMember(speaker_id)
-                if member is not None:
-                    member.stopBroadcast(community.broadcast)
+    def _handle_speak(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        member = self.community.getMember(str(payload.get("speakerId")))
+        if member is not None:
+            member.speak(self.community.broadcast, payload.get("content", ""))
 
+    def _handle_stop_broadcasting(self, payload: dict) -> None:
+        if self.community is None:
+            return
+        member = self.community.getMember(str(payload.get("speakerId")))
+        if member is not None:
+            member.stopBroadcast(self.community.broadcast)
+
+    def _handle_elapsed(self, line: str) -> None:
+        if self.community is None:
+            return
+        inner = line[1:-1].strip()
+        parts = inner.split()
+        amount = int(parts[0])
+        unit = parts[1]
+        self.community.elapseTime(amount, unit)
+
+
+def run_simulation(input_lines: List[str]) -> List[str]:
+    """
+    應用層主模擬器：建立驅動器批次執行所有輸入行並回傳結果清單
+    """
+    output_lines: List[str] = []
+    driver = CommunitySimulationDriver(output_sink=output_lines)
+    for line in input_lines:
+        if line.strip() == "[end]":
+            break
+        driver.execute_line(line)
     return output_lines
 
 
 if __name__ == "__main__":
-    import sys
-
-    # 1. 支援指定檔案參數（python main.py input.txt）
+    # 1. 檔案參數模式（例如：python main.py input.txt）
     if len(sys.argv) > 1:
         with open(sys.argv[1], "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        results = run_simulation(lines)
-        for line in results:
-            print(line)
-    # 2. 管道串接輸入（非互動式 TTY，例如 cat input.txt | python main.py）
-    elif not sys.stdin.isatty():
-        lines = sys.stdin.readlines()
-        results = run_simulation(lines)
-        for line in results:
-            print(line)
-    # 3. 終端機互動式手動輸入（即時互動 REPL 模式）
-    else:
-        output_sink: List[str] = []
-        community: WaterballCommunity = None
-        bot = None
+            for out in run_simulation(f.readlines()):
+                print(out)
 
+    # 2. 管道串接模式（例如：cat input.txt | python main.py）
+    elif not sys.stdin.isatty():
+        for out in run_simulation(sys.stdin.readlines()):
+            print(out)
+
+    # 3. 終端機手動即時互動模式（REPL）
+    else:
+        output_buffer: List[str] = []
+        driver = CommunitySimulationDriver(output_sink=output_buffer)
         print("=== Waterball 互動式模擬環境已啟動 (輸入 [end] 結束) ===")
+
         while True:
             try:
-                raw = input()
+                line = input().strip()
             except EOFError:
                 break
 
-            line = raw.strip()
             if not line:
                 continue
-
             if line == "[end]":
                 print("=== 模擬結束 ===")
                 break
 
-            # 記住執行前的輸出筆數，只印出這一行事件觸發的新輸出
-            prev_len = len(output_sink)
+            prev_len = len(output_buffer)
+            driver.execute_line(line)
 
-            if "elapsed" in line:
-                inner = line[1:-1].strip()
-                parts = inner.split()
-                amount = int(parts[0])
-                unit = parts[1]
-                if community is not None:
-                    community.elapseTime(amount, unit)
-            else:
-                idx = line.find("]")
-                if idx != -1:
-                    event_name = line[1:idx].strip()
-                    payload_str = line[idx + 1:].strip()
-                    payload = json.loads(payload_str) if payload_str else {}
-
-                    if event_name == "started":
-                        initial_time = payload.get("time", "2023-08-07 00:00:00")
-                        quota = payload.get("quota", 10)
-                        community = WaterballCommunity(initialTime=initial_time, output_sink=output_sink)
-                        facade = BotFacade.create(quota=quota)
-                        bot = facade.buildDefaultBot(community)
-
-                    elif event_name == "login":
-                        user_id = str(payload.get("userId"))
-                        is_admin = payload.get("isAdmin", False)
-                        role = Role.ADMIN if is_admin else Role.MEMBER
-                        member = Member(id=user_id, role=role)
-                        if community is not None:
-                            community.login(member)
-
-                    elif event_name == "logout":
-                        user_id = str(payload.get("userId"))
-                        if community is not None:
-                            community.logout(user_id)
-
-                    elif event_name == "new message":
-                        author_id = str(payload.get("authorId"))
-                        content = payload.get("content", "")
-                        tags = payload.get("tags", [])
-                        if community is not None:
-                            member = community.getMember(author_id)
-                            if member is not None:
-                                member.sendMessage(community.chatRoom, content, tags)
-
-                    elif event_name == "new post":
-                        post_id = str(payload.get("id"))
-                        author_id = str(payload.get("authorId"))
-                        title = payload.get("title", "")
-                        content = payload.get("content", "")
-                        tags = payload.get("tags", [])
-                        post = Post(id=post_id, authorId=author_id, title=title, content=content, tags=tags)
-                        if community is not None:
-                            community.forum.createPost(post)
-
-                    elif event_name == "go broadcasting":
-                        speaker_id = str(payload.get("speakerId"))
-                        if community is not None:
-                            member = community.getMember(speaker_id)
-                            if member is not None:
-                                member.startBroadcast(community.broadcast)
-
-                    elif event_name == "speak":
-                        speaker_id = str(payload.get("speakerId"))
-                        content = payload.get("content", "")
-                        if community is not None:
-                            member = community.getMember(speaker_id)
-                            if member is not None:
-                                member.speak(community.broadcast, content)
-
-                    elif event_name == "stop broadcasting":
-                        speaker_id = str(payload.get("speakerId"))
-                        if community is not None:
-                            member = community.getMember(speaker_id)
-                            if member is not None:
-                                member.stopBroadcast(community.broadcast)
-
-            # 即時印出本指令產生的新內容
-            for item in output_sink[prev_len:]:
+            for item in output_buffer[prev_len:]:
                 print(item)
