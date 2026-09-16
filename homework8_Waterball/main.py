@@ -15,9 +15,10 @@ from homework8_Waterball.v1.domain import Member, Post, WaterballCommunity
 
 class CommunitySimulationDriver:
     """
-    應用層事件驅動器 (Application Layer Driver / Input Adapter):
+    應用層事件驅動器 (Application Layer Driver / CLI Entrypoint):
     負責將 README 規範的 JSON 字串輸入，映射調用對應的領域頻道與 BotFacade。
-    使用 Handler 查表分派 (Dispatcher)，消除冗長且重複的 if-else 階梯。
+    使用 Handler 查表分派 (Table-Driven Dispatcher)，消除冗長且重複的 if-else 階梯。
+    注意：此處為單純的 I/O 驅動器與反序列化，非 GoF 轉接器模式 (Adapter Pattern)。
     """
     def __init__(self, output_sink: Optional[List[str]] = None):
         self.output_sink: List[str] = output_sink if output_sink is not None else []
