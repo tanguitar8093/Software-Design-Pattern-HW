@@ -11,14 +11,35 @@
 ```text
 homework8_Waterball/
 ├── v1/
-│   ├── fsm.py          <--> 【通用 FSM 模組】(Template Method + Composite Component/Leaf/Composite)
-│   ├── community.py    <--> 【社群領域層】(Push Observer + Entities + RecordingSession + KnowledgeKingGame)
-│   ├── commands.py     <--> 【指令模組】(Command + Template Method 管線)
-│   ├── states.py       <--> 【具體狀態與策略】(Normal/Record/KnowledgeKing + Guards/Actions)
-│   ├── bot.py          <--> 【Bot 實體與調度】(Invoker + Concrete Observer + Context)
-│   └── facade.py       <--> 【門面模式】(BotFacade 高階 Fluent 裝配)
-├── main.py             <--> 【應用層】(Application Layer / Client 事件驅動器)
-└── tests/              <--> 【獨立 pytest 測試套件】(18 個獨立測項，零後門)
+│   ├── common/                               # 【全域通用與基底】
+│   │   ├── enums.py                          <--> Role, CommunityEventType
+│   │   ├── observer.py                       <--> Observable, CommunityObserver, CommunityEvent (基底)
+│   │   └── events.py                         <--> 7 個具體 CommunityEvent 子類別
+│   │
+│   ├── domain/                               # 【社群領域層 (Domain Layer)】
+│   │   ├── member.py                         <--> Participant, Member (身分與角色)
+│   │   ├── channels/                         # 社群三大基礎頻道
+│   │   │   ├── chat_room.py                  <--> ChatRoom, Message
+│   │   │   ├── forum.py                      <--> Forum, Post, Comment
+│   │   │   └── broadcast.py                  <--> Broadcast, VoiceMessage
+│   │   ├── activities/                       # 兩大活動/遊戲實體
+│   │   │   ├── recording.py                  <--> RecordingSession
+│   │   │   └── knowledge_king.py             <--> KnowledgeKingGame, Question
+│   │   └── community.py                      <--> WaterballCommunity (聚合根)
+│   │
+│   ├── fsm/                                  # 【通用 FSM 模組】(獨立通用)
+│   │   ├── engine.py                         <--> FiniteStateMachine
+│   │   ├── state.py                          <--> State, AtomicState, CompositeState
+│   │   └── transition.py                     <--> Transition, Trigger, Guard, Action, TransitionContext
+│   │
+│   └── bot/                                  # 【社群機器人模組 (Bot Module)】
+│       ├── bot.py                            <--> Bot (Invoker & Observer)
+│       ├── commands.py                       <--> BotCommand, AbstractBotCommand, 具體指令
+│       ├── states.py                         <--> NormalState, RecordState, KnowledgeKingState 及其子狀態與策略
+│       └── facade.py                         <--> BotFacade (Fluent API 門面)
+│
+├── main.py                                   <--> 【應用層】(Application Layer / Client 事件驅動器)
+└── tests/                                    <--> 【獨立 pytest 測試套件】(18 個獨立測項，零後門)
 ```
 
 ---

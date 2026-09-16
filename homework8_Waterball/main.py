@@ -1,7 +1,8 @@
 import json
 from typing import List
-from homework8_Waterball.v1.community import Member, Post, Role, WaterballCommunity
-from homework8_Waterball.v1.facade import BotFacade
+from homework8_Waterball.v1.bot import BotFacade
+from homework8_Waterball.v1.common import Role
+from homework8_Waterball.v1.domain import Member, Post, WaterballCommunity
 
 
 def run_simulation(input_lines: List[str]) -> List[str]:

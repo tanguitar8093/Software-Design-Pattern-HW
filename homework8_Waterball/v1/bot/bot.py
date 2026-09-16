@@ -1,29 +1,16 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from homework8_Waterball.v1.community import (
-    CommunityEvent,
-    CommunityObserver,
-    Message,
-    Participant,
-    Post,
-    Role,
-    VoiceMessage,
-    WaterballCommunity,
-)
+from homework8_Waterball.v1.common.observer import CommunityEvent, CommunityObserver
+from homework8_Waterball.v1.domain.channels import Message, Post, VoiceMessage
+from homework8_Waterball.v1.domain.community import WaterballCommunity
+from homework8_Waterball.v1.domain.member import Participant
 from homework8_Waterball.v1.fsm import FiniteStateMachine, Trigger
 
 if TYPE_CHECKING:
-    from homework8_Waterball.v1.commands import BotCommand
+    from homework8_Waterball.v1.bot.commands import BotCommand
 
 
 class Bot(Participant, CommunityObserver):
-    """
-    社群機器人 (Invoker / Observer / Subsystem Product)
-    - quota: 機器人共用額度
-    - replyCycleIndex: 輪播回覆索引
-    - rootFsm: 通用有限狀態機
-    - commands: 指令註冊表
-    """
     def __init__(self, quota: int = 10):
         super().__init__("bot")
         self.quota: int = quota
@@ -65,8 +52,6 @@ class Bot(Participant, CommunityObserver):
             self._rootFsm.fire(trigger)
 
         # 2. 判定是否為指令（標記 bot，且指令名稱存在於 commands）
-        # README:「當社群成員傳送訊息並標記機器人時，若該訊息符合狀態下的合法指令格式與權限條件，
-        # 機器人仍會先依據當前狀態處理該訊息，之後再執行指令，如：切換狀態。」
         if "bot" in message.tags:
             cmd_name = message.content.strip()
             if cmd_name in self._commands and self._community is not None:
@@ -111,7 +96,7 @@ class Bot(Participant, CommunityObserver):
 
     def commentPost(self, postId: str, content: str, tags: Optional[List[str]] = None) -> None:
         if self._community is not None:
-            from homework8_Waterball.v1.community import Comment
+            from homework8_Waterball.v1.domain.channels import Comment
             comment = Comment("bot", content, tags)
             self._community.forum.addComment(postId, comment)
 
@@ -125,16 +110,12 @@ class Bot(Participant, CommunityObserver):
         self.replyCycleIndex = 0
 
     def getNextReplyMessage(self) -> str:
-        # DefaultConversation 輪播 3 則：
-        # 1. good to hear, 2. thank you, 3. How are you
         messages = ["good to hear", "thank you", "How are you"]
         msg = messages[self.replyCycleIndex % len(messages)]
         self.replyCycleIndex += 1
         return msg
 
     def getNextInteractingMessage(self) -> str:
-        # Interacting 輪播 2 則：
-        # 1. Hi hi😁, 2. I like your idea!
         messages = ["Hi hi😁", "I like your idea!"]
         msg = messages[self.replyCycleIndex % len(messages)]
         self.replyCycleIndex += 1
