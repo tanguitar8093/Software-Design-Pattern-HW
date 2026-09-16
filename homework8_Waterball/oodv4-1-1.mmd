@@ -1,0 +1,113 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v4-1-1：門面模式 (Facade Pattern) 重點圖
+    %% 參考 oodv1-1-4、oodv2-1、oodv3-1-1 精簡聚焦風格：
+    %% 專注於 Facade（BotFacade）如何對 Client 提供流暢高階 API，
+    %% 並在背後協調組裝 FSM 子系統（State/CompositeState/Transition）
+    %% 與 Bot 指令子系統（Bot/BotCommand），徹底隔離應用層與底層複雜度。
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 應用層 (Application Layer / Client)
+    %% ------------------------------------------------
+    class Client {
+        <<Application Layer>>
+        +main(args: String[]) void
+        +setupBot() Bot
+    }
+
+    %% ------------------------------------------------
+    %% 門面 (Facade)
+    %% ------------------------------------------------
+    class BotFacade {
+        <<Facade>>
+        -bot: Bot
+        -currentCompositeState: CompositeState
+        +create() BotFacade$
+        +state(name: String) BotFacade
+        +subState(name: String, state: State) BotFacade
+        +command(name: String, cmd: BotCommand) BotFacade
+        +transition(from: String, to: String, trigger: String) BotFacade
+        +transitionWithGuard(from: String, to: String, trigger: String, guard: Guard) BotFacade
+        +build() Bot
+    }
+
+    %% ------------------------------------------------
+    %% 核心產出物 (Product)
+    %% ------------------------------------------------
+    class Bot {
+        <<Subsystem Product / Invoker>>
+        +quota: int
+        -rootFsm: FiniteStateMachine
+        -commands: Map~String, BotCommand~
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(name: String, member: Member, msg: Message) bool
+    }
+
+    %% ------------------------------------------------
+    %% 被封裝的狀態機子系統 (FSM Subsystem)
+    %% ------------------------------------------------
+    class FiniteStateMachine {
+        <<Subsystem: FSM Engine>>
+        -currentState: State
+        -transitions: List~Transition~
+        +fire(trigger: Trigger) bool
+    }
+
+    class State {
+        <<interface, Subsystem: Component>>
+        +id: String
+        +handle(context: TransitionContext) bool
+    }
+
+    class CompositeState {
+        <<Subsystem: Composite Plugin>>
+        -innerFsm: FiniteStateMachine
+    }
+
+    class Transition {
+        <<Subsystem: Transition>>
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -guard: Guard
+    }
+
+    %% ------------------------------------------------
+    %% 被封裝的指令子系統 (Command Subsystem)
+    %% ------------------------------------------------
+    class BotCommand {
+        <<interface, Subsystem: Command>>
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+
+    %% ------------------------------------------------
+    %% 關聯與依賴結構
+    %% ------------------------------------------------
+    %% Client 僅依賴門面與最終產出 Bot
+    Client ..> BotFacade : calls Fluent API
+    Client ..> Bot : receives built Bot product
+
+    %% Facade 內部創建、裝配並註冊子系統物件
+    BotFacade ..> Bot : creates, configures & returns
+    BotFacade ..> FiniteStateMachine : builds root & sub FSMs
+    BotFacade ..> CompositeState : instantiates & wires
+    BotFacade ..> Transition : creates & configures
+    BotFacade ..> BotCommand : registers to Bot
+
+    %% 子系統內部關聯
+    Bot "1" *-- "1" FiniteStateMachine : rootFsm
+    Bot "1" o-- "0..*" BotCommand : commands
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" *-- "0..*" Transition : transitions
+    State <|.. CompositeState : implements
+    CompositeState "1" *-- "1" FiniteStateMachine : innerFsm
+
+    %% ------------------------------------------------
+    %% 設計說明 Notes
+    %% ------------------------------------------------
+    note for BotFacade "【Facade Pattern: 門面模式】<br/>對應用層提供單一、統一的高階入口：<br/>1. state(name) 宣告主狀態（背後創建 CompositeState）<br/>2. subState(name, state) 注入葉狀態<br/>3. command(name, cmd) 註冊指令<br/>4. transition(from, to, trigger) 串接狀態轉移<br/>5. build() 完成兩層 FSM 裝配並產出 Bot！"
+
+    note for Client "【客戶端極簡宣告】<br/>Client 不需要知道：<br/>- CompositeState 內部如何嵌套 innerFsm<br/>- Transition 如何比對 Trigger 與注入 Guard<br/>- Bot 與 FSM 之間的轉移路由<br/>應用層只需 5~10 行鏈式代碼即可建構完成！"

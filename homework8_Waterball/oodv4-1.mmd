@@ -1,0 +1,108 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v4-1：社群機器人門面模式 (Facade Pattern) 重點圖
+    %% 解決 README 設計需求 - 2：Waterball 社群機器人模組設計
+    %%   1. 提供高階 Fluent API，降低 Client 對底層 FSM/Command 的認知複雜度
+    %%   2. 封裝底層 FSM 引擎、複合狀態與指令清單的內部組裝細節
+    %%   3. 註解一律使用 <br/> 支援換行渲染
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 應用層 (Application Layer / Client)
+    %% ------------------------------------------------
+    class Client {
+        <<Application Layer>>
+        +main(args: String[]) void
+        +setupBot() Bot
+    }
+
+    %% ------------------------------------------------
+    %% 門面 (Facade)
+    %% ------------------------------------------------
+    class BotFacade {
+        <<Facade>>
+        -bot: Bot
+        -rootFsmBuilder: Object
+        -currentCompositeState: CompositeState
+        +create() BotFacade$
+        +state(name: String) BotFacade
+        +subState(name: String, state: State) BotFacade
+        +command(name: String, cmd: BotCommand) BotFacade
+        +transition(from: String, to: String, trigger: String) BotFacade
+        +transitionWithGuard(from: String, to: String, trigger: String, guard: Guard) BotFacade
+        +build() Bot
+    }
+
+    %% ------------------------------------------------
+    %% 被封裝的子系統 (Subsystems Behind Facade)
+    %% ------------------------------------------------
+    class Bot {
+        <<Subsystem Product / Invoker>>
+        +quota: int
+        -rootFsm: FiniteStateMachine
+        -commands: Map~String, BotCommand~
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(name: String, member: Member, msg: Message) bool
+        +onMessageReceived(message: Message) void
+    }
+
+    class FiniteStateMachine {
+        <<Subsystem: FSM Engine>>
+        -currentState: State
+        -transitions: List~Transition~
+        +fire(trigger: Trigger) bool
+    }
+
+    class CompositeState {
+        <<Subsystem: Composite Plugin>>
+        -innerFsm: FiniteStateMachine
+    }
+
+    class Transition {
+        <<Subsystem: FSM Specification>>
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -guard: Guard
+        -action: Action
+    }
+
+    class BotCommand {
+        <<interface, Subsystem: Command>>
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+
+    class Guard {
+        <<interface, Subsystem: Strategy>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    %% ------------------------------------------------
+    %% 關聯與依賴
+    %% ------------------------------------------------
+    %% Client 僅依賴門面與產出物 Bot，完全不感知 FSM/Transition 細節
+    Client ..> BotFacade : uses Fluent API
+    Client ..> Bot : receives built product
+
+    %% Facade 封裝並組裝子系統物件
+    BotFacade ..> Bot : creates, configures & returns
+    BotFacade ..> FiniteStateMachine : assembles
+    BotFacade ..> CompositeState : builds sub-machines
+    BotFacade ..> Transition : configures routes
+    BotFacade ..> BotCommand : registers to Bot
+    BotFacade ..> Guard : injects condition
+
+    %% 子系統內部關聯
+    Bot "1" *-- "1" FiniteStateMachine : rootFsm
+    Bot "1" o-- "0..*" BotCommand : commands
+    FiniteStateMachine "1" *-- "0..*" Transition : transitions
+    CompositeState "1" *-- "1" FiniteStateMachine : innerFsm
+
+    %% ------------------------------------------------
+    %% 設計說明 Notes
+    %% ------------------------------------------------
+    note for BotFacade "【Facade Pattern: 門面模式】<br/>對應用層提供統一、高階且流暢的配置介面：<br/>- state(name) / subState(name, state)<br/>- command(name, cmd)<br/>- transition(from, to, trigger)<br/>- build()<br/>Client 只需 5~10 行宣告式代碼即可產出完整機器人，<br/>底層 FSM 與 Command 的組裝細節完全被封裝在門面背後！"
+
+    note for Client "【最小認知負擔】<br/>Application Layer 開發者不需理解：<br/>1. CompositeState 如何包裝 innerFsm<br/>2. Transition 如何手動注入 Guard/Action<br/>3. Bot 與 FSM 的 Trigger 路由細節<br/>滿足公司快速打造新 Bot 與 A/B Test 的高產能需求！"
