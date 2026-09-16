@@ -1,0 +1,186 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v2-1：通用 FSM 核心設計模式重點圖
+    %% 參考 oodv1-1-4 風格：排除無關的社群領域細節，
+    %% 聚焦在 FSM 引擎、State、Transition、Strategy (Guard/Action)
+    %% 以及 Bot 如何將領域事件轉換為 Trigger 驅動 FSM。
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 領域入口：Bot（FSM Context / 呼叫者）
+    %% ------------------------------------------------
+    class Bot {
+        <<Context Client>>
+        -fsm: FiniteStateMachine
+        +onMessageReceived(message) void
+        +onBroadcastStarted(speakerId) void
+        +onBroadcastStopped(speakerId) void
+        +onTimeElapsed(seconds) void
+    }
+
+    %% ------------------------------------------------
+    %% FSM 事件傳遞與上下文
+    %% ------------------------------------------------
+    class Trigger {
+        +name: String
+        +payload: Map~String, Object~
+    }
+
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+        +target: Object
+    }
+
+    %% ------------------------------------------------
+    %% 通用 FSM 引擎：Template Method 骨架
+    %% ------------------------------------------------
+    class FiniteStateMachine {
+        <<Template Method>>
+        -currentState: State
+        -transitions: List~Transition~
+        +fire(trigger: Trigger) void
+        +getCurrentState() State
+        +changeState(nextState: State) void
+    }
+
+    %% ------------------------------------------------
+    %% 狀態模式：State（通用介面）與具體狀態
+    %% ------------------------------------------------
+    class State {
+        <<interface, State>>
+        +id: String
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) void
+    }
+
+    class NormalState {
+        <<Concrete State>>
+        +id: String = "NORMAL"
+        +onEnter(context) void
+        +onExit(context) void
+        +handle(context) void
+    }
+
+    class RecordState {
+        <<Concrete State>>
+        +id: String = "RECORD"
+        +onEnter(context) void
+        +onExit(context) void
+        +handle(context) void
+    }
+
+    class KnowledgeKingState {
+        <<Concrete State>>
+        +id: String = "KNOWLEDGE_KING"
+        +onEnter(context) void
+        +onExit(context) void
+        +handle(context) void
+    }
+
+    %% ------------------------------------------------
+    %% 狀態轉移與策略模式：Transition + Guard + Action
+    %% ------------------------------------------------
+    class Transition {
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -guard: Guard
+        -action: Action
+        +tryHandle(context: TransitionContext) bool
+    }
+
+    class Guard {
+        <<interface, Strategy>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class HasQuotaGuard {
+        <<Concrete Strategy>>
+        +isSatisfied(context) bool
+    }
+
+    class IsAdminGuard {
+        <<Concrete Strategy>>
+        +isSatisfied(context) bool
+    }
+
+    class OnlineCountGuard {
+        <<Concrete Strategy>>
+        +isSatisfied(context) bool
+    }
+
+    class Action {
+        <<interface, Strategy>>
+        +execute(context: TransitionContext) void
+    }
+
+    class DeductQuotaAction {
+        <<Concrete Strategy>>
+        +execute(context) void
+    }
+
+    class StartRecordAction {
+        <<Concrete Strategy>>
+        +execute(context) void
+    }
+
+    class StartKnowledgeKingAction {
+        <<Concrete Strategy>>
+        +execute(context) void
+    }
+
+    %% ------------------------------------------------
+    %% 關聯與繼承
+    %% ------------------------------------------------
+    %% Bot 擁有 FSM 並產生 Trigger
+    Bot "1" *-- "1" FiniteStateMachine : holds & fires
+    Bot ..> Trigger : converts event to Trigger
+    Bot ..> TransitionContext : passes as target
+
+    %% FSM 與 TransitionContext
+    FiniteStateMachine ..> TransitionContext : creates
+    TransitionContext --> "1" Trigger : trigger
+    TransitionContext --> "1" FiniteStateMachine : fsm
+
+    %% FSM 引擎維護 State 與 Transition
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" *-- "0..*" Transition : transitions
+    Transition --> "1" State : fromState
+    Transition --> "1" State : toState
+
+    %% State 繼承體系（平面狀態）
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+
+    %% Transition 組合 Guard 與 Action 策略
+    Transition o-- "0..1" Guard : condition
+    Transition o-- "0..1" Action : side-effect
+
+    %% 具體策略實作（OCP 擴充點）
+    Guard <|.. HasQuotaGuard
+    Guard <|.. IsAdminGuard
+    Guard <|.. OnlineCountGuard
+
+    Action <|.. DeductQuotaAction
+    Action <|.. StartRecordAction
+    Action <|.. StartKnowledgeKingAction
+
+    %% ------------------------------------------------
+    %% 設計說明 Notes
+    %% ------------------------------------------------
+    note for FiniteStateMachine "【Template Method 轉移骨架】<br/>fire(trigger) 固化轉移核心演算法：<br/>1. 比對 currentState 與 triggerName 尋找候選 Transition<br/>2. guard.isSatisfied(context) 評估條件<br/>3. currentState.onExit(context)<br/>4. transition.action.execute(context)<br/>5. nextState.onEnter(context)<br/>6. currentState = nextState<br/>引擎完全獨立通用，不認識任何社群領域類別。"
+
+    note for State "【State 介面解耦】<br/>State 不再依賴 Bot 或社群訊息；<br/>所有事件與環境資料統一透過 TransitionContext 傳入。<br/>目前為平面狀態，複合狀態（Composite）留待 v3。"
+
+    note for Transition "【轉移規格】<br/>封裝 (fromState, triggerName) → toState。<br/>條件由 Guard 決定，效果由 Action 執行，<br/>讓狀態機的結構與行為規則清晰分離。"
+
+    note for Guard "【Strategy 模式：條件策略】<br/>額度、身分、人數等判斷邏輯抽成獨立策略；<br/>新增判斷條件只需新增 Guard 實作，不修改 FSM。"
+
+    note for Action "【Strategy 模式：動作策略】<br/>扣額度、啟動錄音、出題等副作用抽成獨立策略；<br/>狀態切換伴隨的動作完全以插拔方式組裝。"
+
+    note for Bot "【事件轉換器】<br/>Bot 收到領域事件後，包裝為通用 Trigger(name, payload)<br/>並傳給 fsm.fire(trigger)；<br/>有效隔絕社群領域層與通用 FSM 模組。"

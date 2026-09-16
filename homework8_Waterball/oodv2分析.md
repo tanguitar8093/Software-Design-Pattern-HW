@@ -11,10 +11,10 @@ OOD v1 只處理從 OOA-Clean 已可辨識的兩組 forces：
 
 因此 v1 套用：
 
-| Force | 設計模式 | v1 中的角色 |
-|---|---|---|
+| Force                                                            | 設計模式 | v1 中的角色                                                                                             |
+| ---------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
 | 多個事件來源通知 Bot，且不希望事件來源直接依賴 Bot 的各個處理 FN | Observer | `Observable`、`CommunityObserver`、既有的 `ChatRoom`／`Forum`／`Broadcast`／`WaterballCommunity`、`Bot` |
-| Bot 的行為依目前模式而異，不應集中為一串狀態判斷 | State | `Bot`（Context）、`State`、`NormalState`／`RecordState`／`KnowledgeKingState` |
+| Bot 的行為依目前模式而異，不應集中為一串狀態判斷                 | State    | `Bot`（Context）、`State`、`NormalState`／`RecordState`／`KnowledgeKingState`                           |
 
 ## 2. v1 解決了什麼
 
@@ -55,12 +55,12 @@ dispatchTo(bot: Bot)
 
 例如：
 
-| 具體事件 | 強型別資料 | 固定轉派目標 |
-|---|---|---|
-| `MessageReceivedEvent` | `message: Message` | `Bot.onMessageReceived(message)` |
-| `PostPublishedEvent` | `post: Post` | `Bot.onPostPublished(post)` |
-| `VoiceSpokenEvent` | `voiceMessage: VoiceMessage` | `Bot.onVoiceSpoken(voiceMessage)` |
-| `TimeElapsedEvent` | `seconds: int` | `Bot.onTimeElapsed(seconds)` |
+| 具體事件               | 強型別資料                   | 固定轉派目標                      |
+| ---------------------- | ---------------------------- | --------------------------------- |
+| `MessageReceivedEvent` | `message: Message`           | `Bot.onMessageReceived(message)`  |
+| `PostPublishedEvent`   | `post: Post`                 | `Bot.onPostPublished(post)`       |
+| `VoiceSpokenEvent`     | `voiceMessage: VoiceMessage` | `Bot.onVoiceSpoken(voiceMessage)` |
+| `TimeElapsedEvent`     | `seconds: int`               | `Bot.onTimeElapsed(seconds)`      |
 
 因此，新增事件不能只臨時塞一個字串 type 與任意 payload；必須先定義事件種類，再提供必要資料與固定的 Bot 轉派方式。
 
@@ -212,3 +212,37 @@ v2 的問題才是：
 > 如何把重複、可配置、且需重用的狀態轉換規則，從 Bot 專屬的 Concrete State 中抽成獨立 FSM 模組？
 
 因此下一版應先處理通用 FSM 的 State／Transition／Trigger／Guard／Action 與 entry／exit；複合狀態必須等階層子狀態機的 force 被具體化後，再作為後續一輪設計。
+
+## 7. OOD v2 的架構與設計落實（`oodv2.mmd` 與 `oodv2-1.mmd`）
+
+以 `oodv2.mmd`（全域整合圖）與 `oodv2-1.mmd`（聚焦 FSM 核心設計模式重點圖，風格對標 `oodv1-1-4.mmd`）為具體落實，將系統正式拆分為三層職責：
+
+### 7.1 通用 FSM 模組（化解 5.1、5.2、5.3）
+
+- **通用 `State` 介面**：去除所有對 `Bot`、`Message`、`Post` 等社群領域型別的依賴，統一接收 `TransitionContext`。
+- **固化轉移骨架（Template Method）**：`FiniteStateMachine.fire(trigger)` 固定執行：
+  1. 依據 `currentState` 與 `trigger.name` 尋找候選 `Transition`。
+  2. 呼叫 `guard.isSatisfied(context)` 評估條件。
+  3. `currentState.onExit(context)` 退出舊狀態。
+  4. `transition.action.execute(context)` 執行轉移動作。
+  5. `nextState.onEnter(context)` 進入新狀態。
+  6. 更新 `currentState = nextState`。
+     這徹底消除了各 Concrete State 中重複手寫轉移樣板邏輯的問題（化解 5.1）。
+
+### 7.2 以 Strategy 注入轉移條件與副作用（符合 OCP）
+
+- **`Guard` 策略**：如 `HasQuotaGuard`、`IsAdminGuard`、`OnlineCountGuard`、`IsBroadcastingGuard` 等，將條件邏輯與 FSM 引擎解耦。
+- **`Action` 策略**：如 `DeductQuotaAction`、`StartRecordAction`、`StopRecordAction`、`StartKnowledgeKingAction`、`ResetReplyCycleAction` 等，將副作用動作與轉移機制解耦。
+- 新增或調整轉移條件與動作時，只需新增具體策略類別，FSM 模組完全不需修改。
+
+### 7.3 Bot 與社群事件對接 FSM
+
+- `Bot` 實作 `CommunityObserver`，但內部改為持有 `FiniteStateMachine`。
+- 當社群事件由 `event.dispatchTo(bot)` 呼叫 `Bot.onXxx(...)` 時：
+  `Bot` 將社群事件包裝為通用 `Trigger(name, payload)`，接著呼叫 `fsm.fire(trigger)`。
+- 若無轉移發生，事件亦可交由目前狀態的 `currentState.handle(context)` 執行日常回覆（如輪播回覆）。
+
+### 7.4 邊界守備：平面狀態（呼應 5.4）
+
+- `NormalState`、`RecordState`、`KnowledgeKingState` 在 v2 中仍為平面的 Concrete State。
+- 階層子狀態機（如知識王與錄音內部的多個子階段）與 Composite Pattern，作為 OOD v3 的獨立 forces 再行推進。

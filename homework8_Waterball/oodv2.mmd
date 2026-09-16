@@ -1,0 +1,445 @@
+classDiagram
+    direction TB
+
+    %% ================================================================
+    %% OOD v2：全域整合圖
+    %% OOA 領域 + Push Observer + 獨立通用 FSM 模組 + 領域 Strategy 注入
+    %% 從 v1 演進：將狀態轉移骨架與 Bot 耦合的 State 抽換為通用 FSM
+    %% 此階段尚未引入 Composite Pattern（複合子狀態留待 v3 演進）
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% 【第一層：社群領域層 Waterball Community Domain】
+    %% 沿用 OOA-Clean 的領域模型與既有業務 FN
+    %% ------------------------------------------------
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    %% ------------------------------------------------
+    %% 【事件推播層：Push Observer Model（受約束事件）】
+    %% ------------------------------------------------
+    class Observable {
+        <<interface, Subject>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface, Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class CommunityEventType {
+        <<enumeration>>
+        MESSAGE_RECEIVED
+        POST_PUBLISHED
+        BROADCAST_STARTED
+        VOICE_SPOKEN
+        BROADCAST_STOPPED
+        TIME_ELAPSED
+    }
+
+    class CommunityEvent {
+        <<abstract>>
+        +type: CommunityEventType
+        +dispatchTo(bot: Bot) void
+    }
+
+    class MessageReceivedEvent {
+        +type: CommunityEventType = MESSAGE_RECEIVED
+        +message: Message
+        +dispatchTo(bot: Bot) void
+    }
+
+    class PostPublishedEvent {
+        +type: CommunityEventType = POST_PUBLISHED
+        +post: Post
+        +dispatchTo(bot: Bot) void
+    }
+
+    class BroadcastStartedEvent {
+        +type: CommunityEventType = BROADCAST_STARTED
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+
+    class VoiceSpokenEvent {
+        +type: CommunityEventType = VOICE_SPOKEN
+        +voiceMessage: VoiceMessage
+        +dispatchTo(bot: Bot) void
+    }
+
+    class BroadcastStoppedEvent {
+        +type: CommunityEventType = BROADCAST_STOPPED
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+
+    class TimeElapsedEvent {
+        +type: CommunityEventType = TIME_ELAPSED
+        +seconds: int
+        +dispatchTo(bot: Bot) void
+    }
+
+    %% ------------------------------------------------
+    %% 【第二層：通用有限狀態機模組 Generic FSM Module】
+    %% 獨立通用套件，完全不認識社群機器人或特定領域概念
+    %% ------------------------------------------------
+    class FiniteStateMachine {
+        <<Template Method>>
+        -currentState: State
+        -transitions: List~Transition~
+        +fire(trigger: Trigger) void
+        +getCurrentState() State
+        +changeState(nextState: State) void
+    }
+
+    class State {
+        <<interface>>
+        +id: String
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) void
+    }
+
+    class Transition {
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -guard: Guard
+        -action: Action
+        +tryHandle(context: TransitionContext) bool
+    }
+
+    class Trigger {
+        +name: String
+        +payload: Map~String, Object~
+    }
+
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+        +target: Object
+    }
+
+    class Guard {
+        <<interface, Strategy>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class Action {
+        <<interface, Strategy>>
+        +execute(context: TransitionContext) void
+    }
+
+    %% ------------------------------------------------
+    %% 【第三層：社群機器人與領域策略實現 Bot Module & Strategies】
+    %% ------------------------------------------------
+    class Bot {
+        <<Concrete Observer + FSM Context>>
+        +id: String = "bot"
+        +quota: int
+        +replyCycleIndex: int
+        -fsm: FiniteStateMachine
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStarted(speakerId: String) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+        +resetReplyCycle() void
+        +getNextReplyMessage() String
+    }
+
+    class NormalState {
+        <<Concrete State>>
+        +id: String = "NORMAL"
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) void
+    }
+
+    class RecordState {
+        <<Concrete State>>
+        +id: String = "RECORD"
+        -session: RecordingSession
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) void
+    }
+
+    class KnowledgeKingState {
+        <<Concrete State>>
+        +id: String = "KNOWLEDGE_KING"
+        -game: KnowledgeKingGame
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) void
+    }
+
+    %% 具體領域 Guard 策略（實作 FSM Guard）
+    class HasQuotaGuard {
+        <<Strategy Implementation>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class IsAdminGuard {
+        <<Strategy Implementation>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class OnlineCountGuard {
+        <<Strategy Implementation>>
+        +threshold: int
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class IsBroadcastingGuard {
+        <<Strategy Implementation>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class IsRecorderGuard {
+        <<Strategy Implementation>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    %% 具體領域 Action 策略（實作 FSM Action）
+    class DeductQuotaAction {
+        <<Strategy Implementation>>
+        +execute(context: TransitionContext) void
+    }
+
+    class StartRecordAction {
+        <<Strategy Implementation>>
+        +execute(context: TransitionContext) void
+    }
+
+    class StopRecordAction {
+        <<Strategy Implementation>>
+        +execute(context: TransitionContext) void
+    }
+
+    class StartKnowledgeKingAction {
+        <<Strategy Implementation>>
+        +execute(context: TransitionContext) void
+    }
+
+    class ResetReplyCycleAction {
+        <<Strategy Implementation>>
+        +execute(context: TransitionContext) void
+    }
+
+    %% ------------------------------------------------
+    %% 結構與繼承關聯
+    %% ------------------------------------------------
+    %% OOA 原有領域關係
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+    WaterballCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterballCommunity "1" *-- "1" Forum : 擁有
+    WaterballCommunity "1" *-- "1" Broadcast : 擁有
+    WaterballCommunity "1" *-- "1" Bot : 常駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+
+    %% Push Observer 關係
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    Observable <|.. WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    Observable ..> CommunityEvent : notify(event)
+    CommunityObserver ..> CommunityEvent : update(event)
+    Bot ..> Observable : registered to
+
+    CommunityEvent --> CommunityEventType : fixed type
+    CommunityEvent <|-- MessageReceivedEvent
+    CommunityEvent <|-- PostPublishedEvent
+    CommunityEvent <|-- BroadcastStartedEvent
+    CommunityEvent <|-- VoiceSpokenEvent
+    CommunityEvent <|-- BroadcastStoppedEvent
+    CommunityEvent <|-- TimeElapsedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+    CommunityEvent ..> Bot : dispatchTo(bot)
+
+    %% ------------------------------------------------
+    %% 通用 FSM 內部關聯
+    %% ------------------------------------------------
+    FiniteStateMachine "1" o-- "1..*" State : 管理狀態集合
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" *-- "0..*" Transition : transitions
+    Transition --> "1" State : fromState
+    Transition --> "1" State : toState
+    Transition o-- "0..1" Guard : guard 條件
+    Transition o-- "0..1" Action : action 轉移動作
+    TransitionContext --> "1" Trigger : trigger
+    TransitionContext --> "1" FiniteStateMachine : fsm
+    FiniteStateMachine ..> TransitionContext : 建立並傳遞給 Guard/Action/State
+
+    %% ------------------------------------------------
+    %% Bot 模組與 FSM 策略介接
+    %% ------------------------------------------------
+    Bot "1" *-- "1" FiniteStateMachine : 持有並委派狀態轉移
+    State <|.. NormalState
+    State <|.. RecordState
+    State <|.. KnowledgeKingState
+
+    Guard <|.. HasQuotaGuard
+    Guard <|.. IsAdminGuard
+    Guard <|.. OnlineCountGuard
+    Guard <|.. IsBroadcastingGuard
+    Guard <|.. IsRecorderGuard
+
+    Action <|.. DeductQuotaAction
+    Action <|.. StartRecordAction
+    Action <|.. StopRecordAction
+    Action <|.. StartKnowledgeKingAction
+    Action <|.. ResetReplyCycleAction
+
+    RecordState "1" o-- "0..1" RecordingSession : 錄音活動
+    KnowledgeKingState "1" o-- "0..1" KnowledgeKingGame : 知識王活動
+
+    %% 協作與按需 Pull 關係
+    OnlineCountGuard ..> WaterballCommunity : pull getOnlineCount()
+    IsBroadcastingGuard ..> Broadcast : pull isBroadcasting()
+    NormalState ..> WaterballCommunity : pull getOnlineParticipants()
+    KnowledgeKingState ..> WaterballCommunity : pull currentTime
+    Bot --> ChatRoom : replyChatMessage()
+    Bot --> Forum : commentPost()
+    Bot --> Broadcast : broadcastVoice()
+
+    %% ------------------------------------------------
+    %% 設計說明 Notes
+    %% ------------------------------------------------
+    note for FiniteStateMachine "【Template Method 轉移骨架】<br/>fire(trigger) 固化轉移演算法：<br/>1. 比對 currentState 與 triggerName 尋找候選 Transition<br/>2. guard.isSatisfied(context) 評估是否放行<br/>3. currentState.onExit(context)<br/>4. transition.action.execute(context)<br/>5. nextState.onEnter(context)<br/>6. currentState = nextState<br/>轉移流程完全通用，引擎不認識任何社群業務。"
+
+    note for Transition "【Strategy 策略化轉移】<br/>轉移條件（Guard）與轉移動作（Action）皆抽象為 Strategy。<br/>社群機器人的額度、權限、人數檢查或扣額度、開遊戲等副作用，<br/>均以具體策略類別注入，完全符合 OCP。"
+
+    note for Bot "【事件轉換與 FSM 驅動】<br/>事件流程升級為：<br/>Subject.notify(event) → Bot.update(event)<br/>→ event.dispatchTo(this) → Bot.onXxx(...)<br/>→ Bot 建構通用 Trigger(name, payload)<br/>→ fsm.fire(trigger)<br/>Bot 不再自行手寫 state 切換邏輯，全部委由 FSM。"
+
+    note for State "【v2 邊界：通用平面狀態】<br/>State 抽離了 Bot 專屬介面，改收通用 TransitionContext。<br/>目前 Normal / Record / KnowledgeKing 均為平面狀態，<br/>子狀態機階層（Composite Pattern）留待 v3 演進。"
