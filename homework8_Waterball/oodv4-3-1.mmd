@@ -13,7 +13,7 @@ classDiagram
     %% ------------------------------------------------
     %% 1. 應用層 (Application Layer)
     %% ------------------------------------------------
-    class CommunitySimulationDriver {
+    class Client {
         <<Application Layer / Driver>>
         -output_sink: List~String~
         -community: WaterballCommunity
@@ -333,10 +333,10 @@ classDiagram
     %% 關係與連線 (Relationships)
     %% ------------------------------------------------
     %% Application Layer 呼叫與依賴
-    CommunitySimulationDriver --> WaterballCommunity : instantiates
-    CommunitySimulationDriver ..> BotFacade : create() / buildDefaultBot()
-    CommunitySimulationDriver --> Bot : holds built bot
-    CommunitySimulationDriver ..> Member : handles login/commands
+    Client --> WaterballCommunity : instantiates
+    Client ..> BotFacade : create() / buildDefaultBot()
+    Client --> Bot : holds built bot
+    Client ..> Member : handles login/commands
 
     %% Facade 組裝與封裝關係
     BotFacade *-- Bot : creates & returns

@@ -1,0 +1,146 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% Observer：社群事件 Push Model + 具型別事件路由
+    %% 從 OODv5-1.mmd 抽出的 Observer Pattern 重點圖。
+    %% ================================================================
+
+    class Observable {
+        <<abstract / Subject>>
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+
+    class CommunityObserver {
+        <<interface / Observer>>
+        +update(event: CommunityEvent) void
+    }
+
+    class ChatRoom {
+        <<Concrete Subject>>
+        +postMessage(message: Message) void
+    }
+    class Forum {
+        <<Concrete Subject>>
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+    }
+    class Broadcast {
+        <<Concrete Subject>>
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+    }
+    class WaterballCommunity {
+        <<Concrete Subject>>
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: TimeUnit) void
+    }
+
+    class Bot {
+        <<Concrete Observer>>
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onBroadcastStarted(speakerId: String) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +onOnlineChanged(onlineCount: int) void
+    }
+
+    Observable <|-- ChatRoom
+    Observable <|-- Forum
+    Observable <|-- Broadcast
+    Observable <|-- WaterballCommunity
+    CommunityObserver <|.. Bot
+    Observable "1" o-- "0..*" CommunityObserver : observers
+    Observable ..> CommunityEvent : notify(event)
+    CommunityObserver ..> CommunityEvent : update(event)
+
+    %% 具型別事件：不是 type + Object payload，也不是空介面。
+    class CommunityEvent {
+        <<abstract>>
+        +type: CommunityEventType
+        +dispatchTo(bot: Bot) void
+    }
+    class CommunityEventType {
+        <<enumeration>>
+        MESSAGE_RECEIVED
+        POST_PUBLISHED
+        BROADCAST_STARTED
+        VOICE_SPOKEN
+        BROADCAST_STOPPED
+        TIME_ELAPSED
+        ONLINE_CHANGED
+    }
+    class MessageReceivedEvent {
+        +message: Message
+        +dispatchTo(bot: Bot) void
+    }
+    class PostPublishedEvent {
+        +post: Post
+        +dispatchTo(bot: Bot) void
+    }
+    class BroadcastStartedEvent {
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+    class VoiceSpokenEvent {
+        +voiceMessage: VoiceMessage
+        +dispatchTo(bot: Bot) void
+    }
+    class BroadcastStoppedEvent {
+        +speakerId: String
+        +dispatchTo(bot: Bot) void
+    }
+    class TimeElapsedEvent {
+        +seconds: int
+        +dispatchTo(bot: Bot) void
+    }
+    class OnlineChangedEvent {
+        +onlineCount: int
+        +dispatchTo(bot: Bot) void
+    }
+
+    CommunityEvent --> CommunityEventType : fixed type
+    CommunityEvent <|-- MessageReceivedEvent
+    CommunityEvent <|-- PostPublishedEvent
+    CommunityEvent <|-- BroadcastStartedEvent
+    CommunityEvent <|-- VoiceSpokenEvent
+    CommunityEvent <|-- BroadcastStoppedEvent
+    CommunityEvent <|-- TimeElapsedEvent
+    CommunityEvent <|-- OnlineChangedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+
+    ChatRoom ..> MessageReceivedEvent : creates
+    Forum ..> PostPublishedEvent : creates
+    Broadcast ..> BroadcastStartedEvent : creates
+    Broadcast ..> VoiceSpokenEvent : creates
+    Broadcast ..> BroadcastStoppedEvent : creates
+    WaterballCommunity ..> TimeElapsedEvent : creates
+    WaterballCommunity ..> OnlineChangedEvent : creates
+    MessageReceivedEvent ..> Bot : dispatchTo onMessageReceived
+    PostPublishedEvent ..> Bot : dispatchTo onPostPublished
+    BroadcastStartedEvent ..> Bot : dispatchTo onBroadcastStarted
+    VoiceSpokenEvent ..> Bot : dispatchTo onVoiceSpoken
+    BroadcastStoppedEvent ..> Bot : dispatchTo onBroadcastStopped
+    TimeElapsedEvent ..> Bot : dispatchTo onTimeElapsed
+    OnlineChangedEvent ..> Bot : dispatchTo onOnlineChanged
+
+    class Message
+    class Post
+    class Comment
+    class VoiceMessage
+    class Participant
+    class TimeUnit
+
+    note for CommunityObserver "【Push Model】<br/>Subject 將發生的必要事實包進 CommunityEvent，<br/>主動呼叫 Bot.update(event)。"
+    note for CommunityEvent "【強型別事件契約】<br/>每種事件都固定 type、必要資料與 dispatchTo(bot)。<br/>Bot.update(event) 只需呼叫 event.dispatchTo(this)，<br/>便能轉到既有的 Bot.onXxx() 入口。"

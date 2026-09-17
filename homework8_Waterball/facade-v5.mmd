@@ -1,0 +1,129 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% Facade v5：三層架構與 Bot Module 對 FSM Complexity 的封裝
+    %% 從 OODv5-1.mmd 抽出的 Facade Pattern 重點圖。
+    %% ================================================================
+
+    class CommunitySimulationDriver {
+        <<Application Layer>>
+        -community: WaterballCommunity
+        -bot: Bot
+        +run(inputLines: List~String~) List~String~
+        +executeLine(rawLine: String) void
+    }
+
+    class BotFacade {
+        <<Facade>>
+        +createDefaultBot(community: WaterballCommunity, quota: int) Bot
+        +createBot(community: WaterballCommunity, definition: BotDefinition, quota: int) Bot
+    }
+
+    class BotDefinition {
+        <<Bot Module Configuration>>
+        -rootState: State
+        -rootTransitions: List~Transition~
+        -commands: Map~String, BotCommand~
+        -plugins: List~FsmPlugin~
+        +setInitialState(state: State) BotDefinition
+        +addTransition(transition: Transition) BotDefinition
+        +addCommand(name: String, command: BotCommand) BotDefinition
+        +installPlugin(plugin: FsmPlugin) BotDefinition
+        +buildFsm(target: Any) FiniteStateMachine
+    }
+
+    class Bot {
+        <<Facade Product>>
+        +quota: int
+        +setFsm(fsm: FiniteStateMachine) void
+        +setCommunity(community: WaterballCommunity) void
+        +registerCommand(name: String, command: BotCommand) void
+        +update(event: CommunityEvent) void
+    }
+
+    class WaterballCommunity {
+        +login(participant: Participant) void
+        +register(observer: CommunityObserver) void
+        +chatRoom: ChatRoom
+        +forum: Forum
+        +broadcast: Broadcast
+    }
+    class ChatRoom {
+        +register(observer: CommunityObserver) void
+    }
+    class Forum {
+        +register(observer: CommunityObserver) void
+    }
+    class Broadcast {
+        +register(observer: CommunityObserver) void
+    }
+    class CommunityObserver {
+        <<interface>>
+        +update(event: CommunityEvent) void
+    }
+    class Participant
+    class CommunityEvent
+
+    %% 被 Facade 隱藏的 FSM／Command 細節。
+    class FiniteStateMachine {
+        <<FSM Module>>
+        +addTransition(transition: Transition) void
+        +installPlugin(plugin: FsmPlugin) void
+        +fire(trigger: Trigger) bool
+    }
+    class State {
+        <<FSM Module>>
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+    class Transition {
+        <<FSM Module>>
+        +fromState: State
+        +toState: State
+        +triggerName: String
+    }
+    class Guard {
+        <<FSM Module>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+    class Action {
+        <<FSM Module>>
+        +execute(context: TransitionContext) void
+    }
+    class FsmPlugin {
+        <<FSM Module>>
+        +beforeStateHandle(fsm: FiniteStateMachine, context: TransitionContext) bool
+    }
+    class BotCommand {
+        <<Bot Module>>
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+    class Trigger
+    class TransitionContext
+    class Member
+    class Message
+
+    %% 三層依賴：Application 不直接依賴 FSM Module。
+    CommunitySimulationDriver --> WaterballCommunity : creates / drives events
+    CommunitySimulationDriver ..> BotFacade : requests Bot
+    CommunitySimulationDriver --> Bot : holds
+    BotFacade ..> WaterballCommunity : attaches Bot as observer
+    BotFacade ..> BotDefinition : accepts custom behavior definition
+    BotFacade --> Bot : creates and configures
+    BotDefinition --> FiniteStateMachine : builds
+    BotDefinition o-- Transition
+    BotDefinition o-- BotCommand
+    BotDefinition o-- FsmPlugin
+    Bot --> FiniteStateMachine : delegates triggers
+    Bot --> BotCommand : invokes commands
+    CommunityObserver <|.. Bot
+    Participant <|-- Bot
+    BotFacade ..> ChatRoom : register Bot
+    BotFacade ..> Forum : register Bot
+    BotFacade ..> Broadcast : register Bot
+    BotFacade ..> WaterballCommunity : register Bot / login Bot
+
+    note for BotFacade "【Facade Pattern】<br/>Application Layer 只請求預設 Bot，或交付 BotDefinition。<br/>Facade 封裝：FSM 建立、Transition／Plugin 安裝、<br/>Command 註冊、四個 Subject 的 Observer 訂閱。"
+    note for CommunitySimulationDriver "【三層架構】<br/>Driver 不直接操作 FiniteStateMachine、State、Transition、<br/>Guard、Action 或 Sub-state Plugin。"

@@ -1,0 +1,156 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% FSM v5：FSM Core + State + Strategy + Optional Plugin / Composite
+    %% 從 OODv5-1.mmd 抽出的 FSM 設計模式重點圖。
+    %% ================================================================
+
+    class FiniteStateMachine {
+        <<FSM Core / Context>>
+        -currentState: State
+        -transitions: List~Transition~
+        -plugins: List~FsmPlugin~
+        -target: Any
+        +FiniteStateMachine(initialState: State, target: Any)
+        +setTarget(target: Any) void
+        +getTarget() Any
+        +addTransition(transition: Transition) void
+        +installPlugin(plugin: FsmPlugin) void
+        +uninstallPlugin(plugin: FsmPlugin) void
+        +getCurrentState() State
+        +changeState(nextState: State, context: TransitionContext) void
+        +fire(trigger: Trigger) bool
+    }
+
+    class State {
+        <<abstract / State Pattern>>
+        +id: String
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+
+    class AtomicState {
+        <<abstract / Leaf>>
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+
+    class Transition {
+        <<FSM Specification>>
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -guard: Guard
+        -action: Action
+        +isTriggeredBy(currentState: State, trigger: Trigger) bool
+        +isAllowed(context: TransitionContext) bool
+        +executeAction(context: TransitionContext) void
+    }
+
+    class Trigger {
+        +name: String
+        +payload: Map~String, Any~
+    }
+
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+        +target: Any
+    }
+
+    class Guard {
+        <<interface / Strategy>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class Action {
+        <<interface / Strategy>>
+        +execute(context: TransitionContext) void
+    }
+
+    %% Core State Pattern + Strategy Pattern
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    Transition --> State : fromState / toState
+    Transition --> Guard : guard
+    Transition --> Action : action
+    TransitionContext --> Trigger
+    TransitionContext --> FiniteStateMachine
+    State <|-- AtomicState
+
+    %% ------------------------------------------------
+    %% Plugin + Composite：子狀態機是可選功能，而非 FSM Core 的知識。
+    %% ------------------------------------------------
+    class FsmPlugin {
+        <<interface / Extension Point>>
+        +beforeStateHandle(fsm: FiniteStateMachine, context: TransitionContext) bool
+        +afterStateChanged(fsm: FiniteStateMachine, oldState: State, newState: State, context: TransitionContext) void
+    }
+
+    class SubStateMachinePlugin {
+        <<optional Plugin>>
+        +beforeStateHandle(fsm: FiniteStateMachine, context: TransitionContext) bool
+        +afterStateChanged(fsm: FiniteStateMachine, oldState: State, newState: State, context: TransitionContext) void
+    }
+
+    class CompositeState {
+        <<Composite / Plugin Component>>
+        -innerFsm: FiniteStateMachine
+        +CompositeState(id: String, innerFsm: FiniteStateMachine)
+        +getInnerFsm() FiniteStateMachine
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+
+    FiniteStateMachine "1" o-- "0..*" FsmPlugin : plugins
+    FsmPlugin <|.. SubStateMachinePlugin
+    State <|-- CompositeState
+    CompositeState "1" *-- "1" FiniteStateMachine : innerFsm
+    SubStateMachinePlugin ..> CompositeState : delegate trigger
+
+    %% ------------------------------------------------
+    %% Waterball 將 FSM 套用為主狀態與子狀態。
+    %% ------------------------------------------------
+    class NormalState
+    class RecordState
+    class KnowledgeKingState
+    class DefaultConversationState
+    class InteractingState
+    class WaitingState
+    class RecordingState
+    class QuestioningState
+    class ThanksForJoiningState
+    class OnlineCountGuard
+    class IsBroadcastingGuard
+    class IsRecorderGuard
+    class ResetReplyCycleAction
+    class FlushReplayAction
+    class ResetGameAction
+    class SelectRecordSubStateAction
+    class StopRecordAction
+
+    CompositeState <|-- NormalState
+    CompositeState <|-- RecordState
+    CompositeState <|-- KnowledgeKingState
+    AtomicState <|-- DefaultConversationState
+    AtomicState <|-- InteractingState
+    AtomicState <|-- WaitingState
+    AtomicState <|-- RecordingState
+    AtomicState <|-- QuestioningState
+    AtomicState <|-- ThanksForJoiningState
+    Guard <|.. OnlineCountGuard
+    Guard <|.. IsBroadcastingGuard
+    Guard <|.. IsRecorderGuard
+    Action <|.. ResetReplyCycleAction
+    Action <|.. FlushReplayAction
+    Action <|.. ResetGameAction
+    Action <|.. SelectRecordSubStateAction
+    Action <|.. StopRecordAction
+
+    note for FiniteStateMachine "【State + Strategy】<br/>fire(trigger) 尋找目前 State 的 Transition，<br/>由 Guard 判斷、Action 執行可變轉換行為。<br/>固定順序：oldState.onExit → action → newState.onEnter。"
+    note for SubStateMachinePlugin "【Plugin OCP】<br/>FSM Core 只知道 FsmPlugin。<br/>安裝本 Plugin 才將 CompositeState 的 trigger<br/>委派給 innerFsm；移除即可取消子狀態機支援。"
+    note for CompositeState "【Composite】<br/>CompositeState 與 AtomicState 都是 State。<br/>Composite 可再持有一台 FSM，因此可遞迴形成任意深度。"

@@ -1,0 +1,111 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% Command v5：Command Pattern + Template Method + FSM Trigger
+    %% 從 OODv5-1.mmd 抽出的指令處理重點圖。
+    %% ================================================================
+
+    class Bot {
+        <<Invoker>>
+        +quota: int
+        -commands: Map~String, BotCommand~
+        -rootFsm: FiniteStateMachine
+        +registerCommand(name: String, command: BotCommand) void
+        +executeCommand(name: String, member: Member, message: Message) bool
+    }
+
+    class BotCommand {
+        <<interface / Command>>
+        +canExecute(bot: Bot, member: Member, message: Message) bool
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+
+    class AbstractBotCommand {
+        <<abstract / Template Method>>
+        +requiredQuota: int
+        +requiredRole: Role
+        +canExecute(bot: Bot, member: Member, message: Message) bool
+        +checkQuota(bot: Bot) bool
+        +checkPermission(member: Member) bool
+        +execute(bot: Bot, member: Member, message: Message) bool
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+        +deductQuota(bot: Bot) void
+    }
+
+    class KingCommand {
+        +requiredQuota: int = 5
+        +requiredRole: Role = ADMIN
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+    }
+    class RecordCommand {
+        +requiredQuota: int = 3
+        +requiredRole: Role = MEMBER
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+    }
+    class StopRecordingCommand {
+        +requiredQuota: int = 0
+        +canExecute(bot: Bot, member: Member, message: Message) bool
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+    }
+    class KingStopCommand {
+        +requiredQuota: int = 0
+        +requiredRole: Role = ADMIN
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+    }
+    class PlayAgainCommand {
+        +requiredQuota: int = 5
+        +requiredRole: Role = MEMBER
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+    }
+
+    Bot "1" o-- "0..*" BotCommand : commands
+    BotCommand <|.. AbstractBotCommand
+    AbstractBotCommand <|-- KingCommand
+    AbstractBotCommand <|-- RecordCommand
+    AbstractBotCommand <|-- StopRecordingCommand
+    AbstractBotCommand <|-- KingStopCommand
+    AbstractBotCommand <|-- PlayAgainCommand
+    AbstractBotCommand --> Role : requiredRole
+    BotCommand ..> Bot : execute
+    BotCommand ..> Member : execute
+    BotCommand ..> Message : execute
+
+    %% 具體 Command 不直接切狀態，而是建立 Trigger 交給 FSM。
+    class FiniteStateMachine {
+        +fire(trigger: Trigger) bool
+    }
+    class Trigger {
+        +name: String
+        +payload: Map~String, Any~
+    }
+    class RecordingSession {
+        +recorderId: String
+    }
+    class KnowledgeKingGame
+    class Member {
+        +id: String
+        +role: Role
+    }
+    class Message {
+        +content: String
+        +tags: List~String~
+    }
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    Bot --> FiniteStateMachine : rootFsm
+    KingCommand ..> KnowledgeKingGame : creates
+    RecordCommand ..> RecordingSession : creates
+    KingCommand ..> Trigger : king + game
+    RecordCommand ..> Trigger : record + session
+    StopRecordingCommand ..> Trigger : stop-recording + memberId
+    KingStopCommand ..> Trigger : king-stop
+    PlayAgainCommand ..> Trigger : play again + game
+    Trigger ..> FiniteStateMachine : fire()
+
+    note for AbstractBotCommand "【Template Method】<br/>execute() 固定執行：<br/>1. canExecute（含合法狀態、權限、額度）<br/>2. doExecute() 建立 Trigger 並 fire()<br/>3. 僅成功轉換後 deductQuota()。<br/>各 Concrete Command 只覆寫變動部分。"
+    note for BotCommand "【Command Pattern】<br/>Bot 只依賴 BotCommand，能以名稱註冊／執行。<br/>新增指令不必修改 Bot 的 dispatch 結構。"

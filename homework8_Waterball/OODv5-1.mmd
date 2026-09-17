@@ -1,3 +1,4 @@
+%%{init: {'themeVariables': {'fontSize': '11px'}, 'themeCSS': '.edgeLabel { background-color: white; }'}}%%
 classDiagram
     direction LR
 
@@ -16,7 +17,7 @@ classDiagram
     %% ------------------------------------------------
     %% Application Layer
     %% ------------------------------------------------
-    class CommunitySimulationDriver {
+    class Client {
         <<Application Layer>>
         -outputSink: List~String~
         -community: WaterballCommunity
@@ -499,11 +500,11 @@ classDiagram
     %% ------------------------------------------------
     %% Layer and construction relationships
     %% ------------------------------------------------
-    CommunitySimulationDriver --> WaterballCommunity : creates
-    CommunitySimulationDriver ..> BotFacade : createDefaultBot()
-    CommunitySimulationDriver --> Bot : holds
-    CommunitySimulationDriver ..> Member : creates on login
-    CommunitySimulationDriver ..> Post : creates on new post
+    Client --> WaterballCommunity : creates
+    Client ..> BotFacade : createDefaultBot()
+    Client --> Bot : holds
+    Client ..> Member : creates on login
+    Client ..> Post : creates on new post
     CommunitySimulationDriver --> TimeUnit : parses elapsed unit
 
     BotFacade ..> BotDefinition : custom configuration
