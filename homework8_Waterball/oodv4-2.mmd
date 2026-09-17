@@ -1,0 +1,489 @@
+classDiagram
+    direction LR
+
+    %% ================================================================
+    %% OOD v4-2：依 v1 實際程式碼對照的 Facade Pattern 重點圖
+    %% 與 oodv4-1 的差異：
+    %% - Client 改為實際存在的 CommunitySimulationDriver
+    %% - 不虛構 setupBot() 與 Fluent Builder API
+    %% - Facade 的完整組裝入口是 buildDefaultBot(community)
+    %% ================================================================
+
+    %% ------------------------------------------------
+    %% Application Layer：main.py 實際存在的類別
+    %% main() / run_simulation() 是 module-level function，故不畫成類別方法。
+    %% ------------------------------------------------
+    class CommunitySimulationDriver {
+        <<Application Layer / Client>>
+        -output_sink: List~String~
+        -community: WaterballCommunity
+        -bot: Bot
+        +execute_line(raw_line: String) void
+        -_handle_started(payload: dict) void
+        -_handle_login(payload: dict) void
+        -_handle_logout(payload: dict) void
+        -_handle_new_message(payload: dict) void
+        -_handle_new_post(payload: dict) void
+        -_handle_go_broadcasting(payload: dict) void
+        -_handle_speak(payload: dict) void
+        -_handle_stop_broadcasting(payload: dict) void
+        -_handle_elapsed(line: String) void
+    }
+
+    %% ------------------------------------------------
+    %% Facade：實際 API。不是 Fluent Builder。
+    %% ------------------------------------------------
+    class BotFacade {
+        <<Facade>>
+        -_bot: Bot
+        -_states: Dict~String, State~
+        +create(quota: int = 10) BotFacade$
+        +buildDefaultBot(community: WaterballCommunity) Bot
+        +build() Bot
+    }
+
+    %% ------------------------------------------------
+    %% Facade 產出的 Bot 與其封裝子系統
+    %% ------------------------------------------------
+    class Bot {
+        <<Product / Observer / Invoker>>
+        +quota: int
+        +replyCycleIndex: int
+        -_rootFsm: FiniteStateMachine
+        -_commands: Dict~String, BotCommand~
+        -_community: WaterballCommunity
+        +setFsm(fsm: FiniteStateMachine) void
+        +setCommunity(community: WaterballCommunity) void
+        +getCommunity() WaterballCommunity
+        +registerCommand(name: String, cmd: BotCommand) void
+        +executeCommand(name: String, member: Any, msg: Message) bool
+        +update(event: CommunityEvent) void
+        +onMessageReceived(message: Message) void
+        +onPostPublished(post: Post) void
+        +onVoiceSpoken(voiceMessage: VoiceMessage) void
+        +onBroadcastStarted(speakerId: String) void
+        +onBroadcastStopped(speakerId: String) void
+        +onTimeElapsed(seconds: int) void
+        +onOnlineChanged(onlineCount: int) void
+    }
+
+    class FiniteStateMachine {
+        <<FSM Engine>>
+        -_currentState: State
+        -_transitions: List~Transition~
+        -_target: Any
+        +setTarget(target: Any) void
+        +addTransition(transition: Transition) void
+        +getCurrentState() State
+        +changeState(nextState: State, context: TransitionContext) void
+        +fire(trigger: Trigger) bool
+    }
+
+    class State {
+        <<abstract>>
+        +id: String
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+    class AtomicState {
+        <<abstract>>
+    }
+    class CompositeState {
+        -_innerFsm: FiniteStateMachine
+        +getInnerFsm() FiniteStateMachine
+        +onEnter(context: TransitionContext) void
+        +onExit(context: TransitionContext) void
+        +handle(context: TransitionContext) bool
+    }
+
+    class Transition {
+        +fromState: State
+        +toState: State
+        +triggerName: String
+        -_guard: Guard
+        -_action: Action
+        +tryHandle(context: TransitionContext) bool
+    }
+    class Trigger {
+        +name: String
+        +payload: Dict~String, Any~
+    }
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+        +target: Any
+    }
+    class Guard {
+        <<abstract>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+    class Action {
+        <<abstract>>
+        +execute(context: TransitionContext) void
+    }
+    class FlushReplayAction {
+        <<local class in buildDefaultBot>>
+        +execute(context: TransitionContext) void
+    }
+    class ResetGameAction {
+        <<local class in buildDefaultBot>>
+        +execute(context: TransitionContext) void
+    }
+    class SetupRecordSubStateAction {
+        <<local class in buildDefaultBot>>
+        +execute(context: TransitionContext) void
+    }
+    class StopRecordAndFlushAction {
+        <<local class in buildDefaultBot>>
+        +execute(context: TransitionContext) void
+    }
+    class IsRecorderGuard {
+        <<local class in buildDefaultBot>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    %% ------------------------------------------------
+    %% Command 與實際註冊的具體指令
+    %% ------------------------------------------------
+    class BotCommand {
+        <<abstract>>
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+    class AbstractBotCommand {
+        <<abstract>>
+        +requiredQuota: int
+        +requiredRole: Role
+        +checkQuota(bot: Bot) bool
+        +checkPermission(member: Member) bool
+        +deductQuota(bot: Bot) void
+        +doExecute(bot: Bot, member: Member, message: Message) bool
+        +execute(bot: Bot, member: Member, message: Message) bool
+    }
+    class KingCommand
+    class RecordCommand
+    class StopRecordingCommand
+    class KingStopCommand
+    class PlayAgainCommand
+
+    %% ------------------------------------------------
+    %% buildDefaultBot() 實際組裝的 State、Guard、Action
+    %% ------------------------------------------------
+    class NormalState
+    class RecordState {
+        +session: RecordingSession
+        +onEnter(context: TransitionContext) void
+    }
+    class KnowledgeKingState {
+        +game: KnowledgeKingGame
+        +onEnter(context: TransitionContext) void
+    }
+    class DefaultConversationState
+    class InteractingState
+    class WaitingState
+    class RecordingState
+    class QuestioningState
+    class ThanksForJoiningState
+    class OnlineCountGuard {
+        +threshold: int
+        +greater_or_equal: bool
+        +isSatisfied(context: TransitionContext) bool
+    }
+    class IsBroadcastingGuard {
+        +isSatisfied(context: TransitionContext) bool
+    }
+    class ResetReplyCycleAction {
+        +execute(context: TransitionContext) void
+    }
+
+    %% ------------------------------------------------
+    %% Facade 安裝的 Observer 環境
+    %% ------------------------------------------------
+    class Observable {
+        <<abstract>>
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: CommunityEvent) void
+    }
+    class CommunityObserver {
+        <<abstract>>
+        +update(event: CommunityEvent) void
+    }
+    class WaterballCommunity {
+        +login(participant: Participant) void
+        +getOnlineCount() int
+        +getOnlineParticipants() List~Participant~
+        +chatRoom: ChatRoom
+        +forum: Forum
+        +broadcast: Broadcast
+    }
+    class ChatRoom
+    class Forum
+    class Broadcast {
+        +isBroadcasting() bool
+    }
+    class CommunityEvent {
+        <<abstract>>
+        +type: CommunityEventType
+        +dispatchTo(bot: Any) void
+    }
+    class CommunityEventType {
+        <<enumeration>>
+        MESSAGE_RECEIVED
+        POST_PUBLISHED
+        BROADCAST_STARTED
+        VOICE_SPOKEN
+        BROADCAST_STOPPED
+        TIME_ELAPSED
+        ONLINE_CHANGED
+    }
+    class MessageReceivedEvent {
+        +message: Message
+        +dispatchTo(bot: Any) void
+    }
+    class PostPublishedEvent {
+        +post: Post
+        +dispatchTo(bot: Any) void
+    }
+    class BroadcastStartedEvent {
+        +speakerId: String
+        +dispatchTo(bot: Any) void
+    }
+    class VoiceSpokenEvent {
+        +voiceMessage: VoiceMessage
+        +dispatchTo(bot: Any) void
+    }
+    class BroadcastStoppedEvent {
+        +speakerId: String
+        +dispatchTo(bot: Any) void
+    }
+    class TimeElapsedEvent {
+        +seconds: int
+        +dispatchTo(bot: Any) void
+    }
+    class OnlineChangedEvent {
+        +onlineCount: int
+        +dispatchTo(bot: Any) void
+    }
+    class Member
+    class Participant
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +scores: Dict~String, int~
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +getWinner() String
+    }
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    %% Application layer 真實呼叫：_handle_started 建立 Community，然後委派 Facade。
+    CommunitySimulationDriver --> WaterballCommunity : creates in _handle_started()
+    CommunitySimulationDriver ..> BotFacade : create(quota)\\nbuildDefaultBot(community)
+    CommunitySimulationDriver --> Bot : stores built bot
+    CommunitySimulationDriver ..> Member : creates on login
+    CommunitySimulationDriver ..> Post : creates on new post
+    CommunitySimulationDriver ..> ChatRoom : sends message through Member
+    CommunitySimulationDriver ..> Broadcast : starts / speaks / stops through Member
+
+    %% Facade 的真實封裝範圍。
+    BotFacade *-- Bot : creates once
+    BotFacade ..> FiniteStateMachine : builds root and inner FSMs
+    BotFacade ..> NormalState : configures
+    BotFacade ..> RecordState : configures
+    BotFacade ..> KnowledgeKingState : configures
+    BotFacade ..> Transition : adds routes
+    BotFacade ..> Guard : injects guards
+    BotFacade ..> Action : injects actions
+    BotFacade ..> BotCommand : registers commands
+    BotFacade ..> WaterballCommunity : registers Bot as observer
+    BotFacade ..> FlushReplayAction : local action
+    BotFacade ..> ResetGameAction : local action
+    BotFacade ..> SetupRecordSubStateAction : local action
+    BotFacade ..> StopRecordAndFlushAction : local action
+    BotFacade ..> IsRecorderGuard : local guard
+
+    %% Bot / FSM / Composite 實際關係。
+    Participant <|-- Bot
+    CommunityObserver <|.. Bot
+    Bot "1" --> "0..1" FiniteStateMachine : _rootFsm
+    Bot "1" o-- "0..*" BotCommand : _commands
+    Bot --> WaterballCommunity : _community
+    Bot ..> CommunityEvent : update(event)
+    Bot ..> Message : onMessageReceived() / replyChatMessage()
+    Bot ..> Post : onPostPublished()
+    Bot ..> VoiceMessage : onVoiceSpoken() / broadcastVoice()
+    Bot ..> ChatRoom : replyChatMessage()
+    Bot ..> Forum : commentPost()
+    Bot ..> Broadcast : broadcastVoice()
+    FiniteStateMachine "1" *-- "0..*" Transition : _transitions
+    FiniteStateMachine "1" --> "0..1" State : _currentState
+    Transition --> State : fromState / toState
+    Transition --> Guard : _guard
+    Transition --> Action : _action
+    TransitionContext --> Trigger
+    TransitionContext --> FiniteStateMachine
+    State <|-- AtomicState
+    State <|-- CompositeState
+    CompositeState "1" *-- "1" FiniteStateMachine : _innerFsm
+
+    %% 實際 Composite 樹：主狀態與葉狀態。
+    CompositeState <|-- NormalState
+    CompositeState <|-- RecordState
+    CompositeState <|-- KnowledgeKingState
+    AtomicState <|-- DefaultConversationState
+    AtomicState <|-- InteractingState
+    AtomicState <|-- WaitingState
+    AtomicState <|-- RecordingState
+    AtomicState <|-- QuestioningState
+    AtomicState <|-- ThanksForJoiningState
+    Guard <|-- OnlineCountGuard
+    Guard <|-- IsBroadcastingGuard
+    Action <|-- ResetReplyCycleAction
+    Action <|-- FlushReplayAction
+    Action <|-- ResetGameAction
+    Action <|-- SetupRecordSubStateAction
+    Action <|-- StopRecordAndFlushAction
+    Guard <|-- IsRecorderGuard
+    FlushReplayAction --> Bot
+    FlushReplayAction --> RecordState
+    ResetGameAction --> Bot
+    ResetGameAction --> KnowledgeKingState
+    SetupRecordSubStateAction --> RecordState
+    SetupRecordSubStateAction --> State : waiting / recording
+    StopRecordAndFlushAction --> Bot
+    StopRecordAndFlushAction --> RecordState
+    IsRecorderGuard --> RecordState
+
+    %% Command 階層。
+    BotCommand <|-- AbstractBotCommand
+    AbstractBotCommand <|-- KingCommand
+    AbstractBotCommand <|-- RecordCommand
+    AbstractBotCommand <|-- StopRecordingCommand
+    AbstractBotCommand <|-- KingStopCommand
+    AbstractBotCommand <|-- PlayAgainCommand
+    AbstractBotCommand --> Role
+    BotCommand ..> Bot : execute(bot, ...)
+    BotCommand ..> Member : execute(..., member, ...)
+    BotCommand ..> Message : execute(..., message)
+    KingCommand ..> KnowledgeKingGame : creates
+    RecordCommand ..> RecordingSession : creates
+    KingCommand ..> Trigger : creates king trigger
+    RecordCommand ..> Trigger : creates record trigger
+    StopRecordingCommand ..> Trigger : creates stop-recording trigger
+    KingStopCommand ..> Trigger : creates king-stop trigger
+    PlayAgainCommand ..> KnowledgeKingGame : creates
+    PlayAgainCommand ..> Trigger : creates play again trigger
+
+    %% Observer 訂閱；buildDefaultBot() 對四個既有 Subject register Bot。
+    Observable <|.. WaterballCommunity
+    Observable <|.. ChatRoom
+    Observable <|.. Forum
+    Observable <|.. Broadcast
+    WaterballCommunity *-- ChatRoom
+    WaterballCommunity *-- Forum
+    WaterballCommunity *-- Broadcast
+    BotFacade ..> ChatRoom : register(bot)
+    BotFacade ..> Forum : register(bot)
+    BotFacade ..> Broadcast : register(bot)
+    BotFacade ..> WaterballCommunity : register(bot)
+    Observable ..> CommunityEvent : notify(event)
+
+    %% 領域物件與事件資料：每個實作類別都必須有實際關聯，不能成為孤兒。
+    Participant <|-- Member
+    Member --> Role
+    Member ..> ChatRoom : sendMessage()
+    Member ..> Forum : publishPost() / commentPost()
+    Member ..> Broadcast : start() / speak() / stop()
+    WaterballCommunity "1" o-- "0..*" Participant : _onlineParticipants
+    WaterballCommunity "1" o-- "0..*" Member : _membersMap
+    WaterballCommunity ..> OnlineChangedEvent : creates on login / logout
+    WaterballCommunity ..> TimeElapsedEvent : creates on elapseTime()
+    ChatRoom ..> Message : postMessage(message)
+    ChatRoom ..> MessageReceivedEvent : creates and notifies
+    Forum "1" o-- "0..*" Post : _posts
+    Forum ..> Post : createPost(post)
+    Forum ..> Comment : addComment(comment)
+    Forum ..> PostPublishedEvent : creates and notifies
+    Post "1" o-- "0..*" Comment : _comments
+    Broadcast ..> VoiceMessage : speak(voiceMessage)
+    Broadcast ..> BroadcastStartedEvent : creates and notifies
+    Broadcast ..> VoiceSpokenEvent : creates and notifies
+    Broadcast ..> BroadcastStoppedEvent : creates and notifies
+    RecordingSession "1" o-- "0..*" VoiceMessage : _voices
+    KnowledgeKingGame "1" *-- "3" Question : questions
+
+    %% CommunityEvent 完整繼承、payload 與 dispatch 關係。
+    CommunityEvent --> CommunityEventType : type
+    CommunityEvent <|-- MessageReceivedEvent
+    CommunityEvent <|-- PostPublishedEvent
+    CommunityEvent <|-- BroadcastStartedEvent
+    CommunityEvent <|-- VoiceSpokenEvent
+    CommunityEvent <|-- BroadcastStoppedEvent
+    CommunityEvent <|-- TimeElapsedEvent
+    CommunityEvent <|-- OnlineChangedEvent
+    MessageReceivedEvent --> Message
+    PostPublishedEvent --> Post
+    VoiceSpokenEvent --> VoiceMessage
+    MessageReceivedEvent ..> Bot : dispatchTo onMessageReceived()
+    PostPublishedEvent ..> Bot : dispatchTo onPostPublished()
+    BroadcastStartedEvent ..> Bot : dispatchTo onBroadcastStarted()
+    VoiceSpokenEvent ..> Bot : dispatchTo onVoiceSpoken()
+    BroadcastStoppedEvent ..> Bot : dispatchTo onBroadcastStopped()
+    TimeElapsedEvent ..> Bot : dispatchTo onTimeElapsed()
+    OnlineChangedEvent ..> Bot : dispatchTo onOnlineChanged()
+
+    %% bot/states.py 對 Bot、FSM 與活動資料的實際依賴。
+    OnlineCountGuard ..> Bot : reads community
+    IsBroadcastingGuard ..> Bot : reads community
+    DefaultConversationState ..> Bot : replies / comments
+    InteractingState ..> Bot : replies / comments
+    RecordingState ..> Bot : gets root FSM / session
+    QuestioningState ..> Bot : gets root FSM / game
+    ThanksForJoiningState ..> Bot : announces winner
+    RecordState --> RecordingSession : session
+    KnowledgeKingState --> KnowledgeKingGame : game
+    QuestioningState ..> KnowledgeKingGame : submits answer
+    RecordingState ..> RecordingSession : adds voice
+
+    note for CommunitySimulationDriver "【實際 Client】<br/>沒有 setupBot()。<br/>_handle_started() 直接建立 Community，<br/>再呼叫 BotFacade.create(quota)<br/>與 buildDefaultBot(community)。"
+    note for BotFacade "【實際 Facade 邊界】<br/>這是預設組態組裝型 Facade，<br/>不是讓 Client 以 state()/transition() 自行拼裝的 Fluent Builder。<br/>buildDefaultBot() 在內部建立 root/inner FSM、Transition、<br/>Command，並完成四個 Subject 的 Bot 訂閱。"
+    note for Action "FlushReplayAction、ResetGameAction、<br/>SetupRecordSubStateAction、StopRecordAndFlushAction<br/>與 IsRecorderGuard 在目前程式中定義為<br/>buildDefaultBot() 的 local class；本圖已明確畫出它們。"
