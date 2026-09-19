@@ -1,0 +1,56 @@
+🕑 3 seconds elapsed...
+💬 1: 大家早安，今天我第一天上班呢
+🤖: good to hear @1
+💬 4: 祝大家今天事事順利 @1
+🤖: thank you @4
+🕑 10 seconds elapsed...
+💬 1: wow 有 10 個人在線上了呢（包含機器人）
+🤖: Hi hi😁 @1
+💬 1: 大家早安，今天要吃麥當勞嗎？
+🤖: I like your idea! @1
+💬 8: 發了一個文，分享笑話，哈哈
+🤖: Hi hi😁 @8
+8: 【分享一個關於 單一職責原則 的笑話，每次講起來都還是覺得很好笑】(1) 欸你這個類別這樣做太多事了吧，違反單一職責原則啊，每個類別只能有一個職責，只能做一件事。 (2) 這個類別，確實只做一件事，那就是實現需求！ @1, @2, @3
+🤖 comment in post 1: How do you guys think about it? @bot, @1, @2, @3, @4, @5, @6, @7, @8, @9
+💬 1: king @bot
+🤖: I like your idea! @1
+🤖: KnowledgeKing is started!
+🤖: 0. 請問哪個 SQL 語句用於選擇所有的行？
+A) SELECT *
+B) SELECT ALL
+C) SELECT ROWS
+D) SELECT DATA
+💬 6: A @bot
+🤖: Congrats! you got the answer! @6
+🤖: 1. 請問哪個 CSS 屬性可用於設置文字的顏色？
+A) text-align
+B) font-size
+C) color
+D) padding
+💬 8: C @bot
+🤖: Congrats! you got the answer! @8
+🤖: 2. 請問在計算機科學中，「XML」代表什麼？
+A) Extensible Markup Language
+B) Extensible Modeling Language
+C) Extended Markup Language
+D) Extended Modeling Language
+🕑 3 seconds elapsed...
+💬 3: C @bot
+💬 2: A @bot
+🤖: Congrats! you got the answer! @2
+🤖 go broadcasting...
+🤖 speaking: Tie!
+🤖 stop broadcasting...
+🕑 20 seconds elapsed...
+💬 3: record @bot
+🤖: Hi hi😁 @3
+📢 4 is broadcasting...
+📢 4: 大家早安
+📢 4: 各位有吃早餐嗎？
+📢 4 stop broadcasting
+🤖: [Record Replay] 大家早安
+各位有吃早餐嗎？ @3
+💬 3: stop-recording @bot
+🕑 3 seconds elapsed...
+💬 1: 呀，大家下線了
+🤖: good to hear @1

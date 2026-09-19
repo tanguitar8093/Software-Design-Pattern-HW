@@ -1,0 +1,268 @@
+classDiagram
+    direction TB
+
+    %% ======================= 觀察者模式 (Observer Pattern) =======================
+    %% Force-擴充性：擴充新的 <觀察者> 時，不必修改既有 <EventPublisher>
+    %% Force-行為變動性：Bot 對於不同 <事件> 皆得到不同的響應結果，且需一致的通知管道
+
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() String
+    }
+
+    note for DomainEvent "【getSourceId() 對應各事件的發起者欄位】<br/>Message/Post/Comment → authorId；VoiceMessage → speakerId；LoginEvent/LogoutEvent → userId；BroadcastStartedEvent/BroadcastStoppedEvent → speakerId；TimeElapsedEvent 無發起者，回傳 null"
+
+    class CommunityObserver {
+        <<interface>>
+        +getId() String
+        +onEvent(event: DomainEvent) void
+    }
+
+    note for CommunityObserver "【getId() 用於比對事件來源】<br/>Bot 透過繼承 Participant 的 id 欄位實作 getId()，回傳 this.id（預設 \"bot\"），供 EventPublisher.notify() 判斷是否為自己發起的事件"
+
+    class EventPublisher {
+        -observers: List~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+
+    note for EventPublisher "【共用單一實例，而非繼承】<br/>EventPublisher 是具體類別，WaterballCommunity 只組合(has-a)一顆實例；ChatRoom/Forum/Broadcast 皆不繼承它，而是各自持有對它的參考(use-a)，在自身動作完成後呼叫同一顆實例的 notify(event)：<br/>notify(event):<br/>for all o in observers { if o.getId() != null and o.getId() == event.getSourceId(): continue; o.onEvent(event) }<br/>【防迴音(Echo Suppression)】不通知事件發起者自己，此規則統一寫在 EventPublisher，未來新增 Observer 不必各自重複判斷"
+
+    class LoginEvent {
+        +userId: String
+        +isAdmin: bool
+    }
+
+    class LogoutEvent {
+        +userId: String
+    }
+
+    class BroadcastStartedEvent {
+        +speakerId: String
+    }
+
+    class BroadcastStoppedEvent {
+        +speakerId: String
+    }
+
+    class TimeElapsedEvent {
+        +amount: int
+        +unit: String
+    }
+
+    %% ======================= 狀態模式 (State Pattern) =======================
+    %% Force-擴充性：擴充新的 <狀態> 時，不必修改既有 <Bot>
+    %% Force-行為變動性：Bot 在不同 <狀態> 下對同一 <事件> 的響應皆不同
+
+    class BotState {
+        <<interface>>
+        +onEvent(bot: Bot, event: DomainEvent) void
+    }
+
+    class DefaultConversationState {
+        +replyCycleIndex: int
+        +getNextReplyMessage() String
+    }
+
+    class InteractingState {
+        +replyCycleIndex: int
+        +getNextReplyMessage() String
+    }
+
+    class WaitingState {
+    }
+
+    class RecordingState {
+        +session: RecordingSession
+    }
+
+    class QuestioningState {
+        +game: KnowledgeKingGame
+    }
+
+    class ThanksForJoiningState {
+        +game: KnowledgeKingGame
+    }
+
+    class WaterballCommunity {
+        +currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: String) void
+        +elapseTime(amount: int, unit: String) void
+        +getOnlineParticipants() List~Participant~
+        +getOnlineCount() int
+    }
+
+    class Participant {
+        <<abstract>>
+        +id: String
+    }
+
+    class Member {
+        +role: Role
+        +sendMessage(chatRoom: ChatRoom, content: String, tags: List~String~) void
+        +publishPost(forum: Forum, title: String, content: String, tags: List~String~) void
+        +commentPost(forum: Forum, postId: String, content: String, tags: List~String~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: String) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class Bot {
+        +id: String = "bot"
+        +quota: int
+        +currentState: BotState
+        +onEvent(event: DomainEvent) void
+        +transitionTo(state: BotState) void
+        +replyChatMessage(content: String, tags: List~String~) void
+        +commentPost(postId: String, content: String, tags: List~String~) void
+        +broadcastVoice(content: String) void
+    }
+
+    class ChatRoom {
+        +postMessage(message: Message) void
+    }
+
+    class Message {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: String, comment: Comment) void
+    }
+
+    class Post {
+        +id: String
+        +authorId: String
+        +title: String
+        +content: String
+        +tags: List~String~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        +authorId: String
+        +content: String
+        +tags: List~String~
+    }
+
+    class Broadcast {
+        +currentSpeakerId: String
+        +start(speakerId: String) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: String) void
+        +isBroadcasting() bool
+    }
+
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+
+    class KnowledgeKingGame {
+        +currentQuestionIndex: int
+        +startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+    }
+
+    class Question {
+        +number: int
+        +description: String
+        +options: List~String~
+        +correctAnswer: String
+        +isCorrect(answer: String) bool
+    }
+
+    %% 觀察者模式關係
+    DomainEvent <|.. Message
+    DomainEvent <|.. Post
+    DomainEvent <|.. Comment
+    DomainEvent <|.. VoiceMessage
+    DomainEvent <|.. LoginEvent
+    DomainEvent <|.. LogoutEvent
+    DomainEvent <|.. BroadcastStartedEvent
+    DomainEvent <|.. BroadcastStoppedEvent
+    DomainEvent <|.. TimeElapsedEvent
+    EventPublisher "1" o-- "0..*" CommunityObserver : - observers
+    CommunityObserver <|.. Bot
+    WaterballCommunity "1" *-- "1" EventPublisher : 統一發布中心
+    ChatRoom "1" --> "1" EventPublisher : 使用
+    Forum "1" --> "1" EventPublisher : 使用
+    Broadcast "1" --> "1" EventPublisher : 使用
+    Bot "1" --> "1" EventPublisher : 註冊
+
+    %% 狀態模式關係
+    BotState <|.. DefaultConversationState
+    BotState <|.. InteractingState
+    BotState <|.. WaitingState
+    BotState <|.. RecordingState
+    BotState <|.. QuestioningState
+    BotState <|.. ThanksForJoiningState
+    Bot "1" --> "1" BotState : currentState
+    RecordingState "1" *-- "1" RecordingSession
+    QuestioningState "1" *-- "1" KnowledgeKingGame
+    ThanksForJoiningState "1" --> "1" KnowledgeKingGame
+
+    %% 繼承關係
+    Participant <|-- Member
+    Participant <|-- Bot
+    Member --> Role
+
+    %% 社群整體聚合
+    WaterballCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterballCommunity "1" *-- "1" Forum : 擁有
+    WaterballCommunity "1" *-- "1" Broadcast : 擁有
+    WaterballCommunity "1" *-- "1" Bot : 常駐
+    WaterballCommunity "1" o-- "0..*" Participant : 在線參與者
+
+    %% 訊息與內容關聯
+    ChatRoom "1" *-- "0..*" Message
+    Forum "1" *-- "0..*" Post
+    Post "1" *-- "0..*" Comment
+    Broadcast "1" *-- "0..*" VoiceMessage
+
+    %% 機器人主動操作社群組件
+    Bot --> ChatRoom : 發送訊息
+    Bot --> Forum : 發表留言
+    Bot --> Broadcast : 廣播語音
+    KnowledgeKingGame "1" *-- "3" Question : 包含題庫
+    RecordingSession "1" o-- "0..*" VoiceMessage : 記錄語音內容
+
+    %% 互動行為便條紙 (誰為了做甚麼事操作了誰的方法)
+    note for Member "【Member 互動行為】<br/>1. 交流/下指令：呼叫 ChatRoom.postMessage(Message)<br/>2. 論壇發布/回文：呼叫 Forum.createPost(Post)、Forum.addComment(postId, Comment)<br/>3. 語音廣播：呼叫 Broadcast.start(id)、Broadcast.speak(VoiceMessage)、Broadcast.stop(id)<br/>4. 上述操作皆會使該 EventPublisher（ChatRoom/Forum/Broadcast/WaterballCommunity）呼叫 notify(event) 通知 Bot"
+
+    note for ChatRoom "【ChatRoom 使用共用的 EventPublisher】<br/>postMessage(message) 內部除了輸出/保存訊息外，最後會呼叫 WaterballCommunity 唯一那顆 EventPublisher 的 notify(message)；ChatRoom 本身不持有 observers 清單，也不繼承任何發布邏輯"
+
+    note for Forum "【Forum 使用共用的 EventPublisher】<br/>createPost(post)、addComment(postId, comment) 完成後皆會呼叫同一顆 EventPublisher 的 notify(post/comment)"
+
+    note for Broadcast "【Broadcast 使用共用的 EventPublisher】<br/>start/speak/stop 完成後會分別呼叫同一顆 EventPublisher 的 notify(BroadcastStartedEvent)/notify(VoiceMessage)/notify(BroadcastStoppedEvent)"
+
+    note for WaterballCommunity "【WaterballCommunity 擁有唯一的 EventPublisher】<br/>login/logout/elapseTime 完成後會呼叫自己組合持有的 EventPublisher 之 notify(LoginEvent)/notify(LogoutEvent)/notify(TimeElapsedEvent)；同時也是 ChatRoom/Forum/Broadcast 共用同一顆 EventPublisher 的來源"
+
+    note for Bot "【Bot 觀察者行為】<br/>1. Bot 實作 CommunityObserver，只需向 WaterballCommunity 持有的那一顆 EventPublisher 註冊一次 register(this)，即可收到 ChatRoom/Forum/Broadcast/WaterballCommunity 四方共用同一發布中心送出的所有事件<br/>2. 任何 DomainEvent 發生時，onEvent(event) 皆會被統一呼叫，不需關心事件來源<br/>【Bot 狀態委派行為】<br/>3. onEvent(event) 內部委派給 currentState.onEvent(this, event) 處理，依當前狀態產生不同回應<br/>4. 狀態處理完畢後可能呼叫 transitionTo(newState) 切換至下一狀態"
+
+    note for BotState "【BotState 互動行為】<br/>1. 各具體狀態依事件類型（Message/Post/VoiceMessage/LoginEvent...）判斷是否為指令、是否符合權限與額度，決定呼叫 Bot.replyChatMessage()/commentPost()/broadcastVoice() 或 transitionTo()<br/>2. RecordingState 持有 RecordingSession 收音；QuestioningState 持有 KnowledgeKingGame 主持答題"
+
+    note for KnowledgeKingGame "【KnowledgeKingGame 互動行為】<br/>1. 答題評分：QuestioningState 收到標記 bot 的 Message 後呼叫 submitAnswer(memberId, ans)，內部比對 Question.isCorrect()，答對者累加 1 分<br/>2. 判斷獲勝：3 題答完或 1 小時超時後由狀態呼叫 getWinner() 依分數結算贏家或 Tie"
+
+    note for RecordingSession "【RecordingSession 互動行為】<br/>1. 累積語音：RecordingState 於講者說話時操作 addVoice(VoiceMessage) 逐筆記錄<br/>2. 產出內容：結束錄音時 RecordingState 呼叫 generateReplay() 取得整合文字格式發送到聊天室"
