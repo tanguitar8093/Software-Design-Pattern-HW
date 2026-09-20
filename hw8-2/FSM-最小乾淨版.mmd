@@ -1,0 +1,65 @@
+classDiagram
+    direction LR
+
+    class FiniteStateMachine {
+        +currentState: State
+        +transitions: List~Transition~
+        +dispatch(event: Event, context: Context)
+        +addTransition(transition: Transition)
+        +enterInitialState()
+    }
+
+    class State {
+        +id: String
+        +entryAction: Action
+        +exitAction: Action
+        +enter()
+        +exit()
+    }
+
+    class Event {
+        +name: String
+        +payload: Map
+        +getName()
+        +getPayload()
+    }
+
+    class Guard {
+        <<interface>>
+        +check(context: Context): boolean
+    }
+
+    class Action {
+        <<interface>>
+        +execute(context: Context): void
+    }
+
+    class Transition {
+        +from: State
+        +to: State
+        +event: Event
+        +guard: Guard
+        +action: Action
+        +canTrigger(event: Event, context: Context): boolean
+        +execute(context: Context)
+    }
+
+    class Context {
+        +sourceId: String
+        +content: String
+        +quota: int
+        +onlineCount: int
+        +isBroadcasting: bool
+        +currentTime: DateTime
+    }
+
+    FiniteStateMachine --> State
+    FiniteStateMachine --> Transition
+    FiniteStateMachine ..> Event
+    Transition --> State
+    Transition --> Event
+    Transition --> Guard
+    Transition --> Action
+    State --> Action
+    Guard ..> Context
+    Action ..> Context

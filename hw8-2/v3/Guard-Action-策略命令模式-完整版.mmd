@@ -1,19 +1,76 @@
 classDiagram
     direction TB
 
-    %% ======================================================================
-    %% 本檔案是 Guard(策略模式)/Action(命令模式) 家族的「完整版」
-    %% 對照對象：/home/tanguitar/workspaces/dp-homework/hw8-2/v3/FSM拆解表格.md 全部 4 張轉移表
-    %% 對照結果：先前的乾淨圖(只有 RoleGuard/QuotaGuard/RecorderGuard/ParticipantCountGuard/AndGuard
-    %%          與 DeductQuotaAction/ReplyChatMessageAction/CommentOnPostAction/BroadcastVoiceAction/CompositeAction)
-    %%          尚未覆蓋所有表格列，本檔案補齊缺漏後，才是完整版。
-    %% 本檔案只處理 Guard/Action 兩個策略/命令家族本身，不含 Transition、FiniteStateMachine
-    %% （這兩者依前一輪討論結論，不需要套用策略/命令模式，將於下一步接線時另外設計）
-    %% ======================================================================
+    %% ============================================================
+    %% FSM 核心抽象：State + Event + Guard + Action + Transition
+    %% 這版固定對應便條紙中的職責與互動操作
+    %% ============================================================
 
-    %% ---------------------------------------------------------------
-    %% TransitionContext：Guard/Action 存取轉移相關資料的唯一管道
-    %% ---------------------------------------------------------------
+    class FiniteStateMachine {
+        +currentState: State
+        +transitions: List~Transition~
+        +dispatch(event: Event, context: TransitionContext)
+        +addTransition(transition: Transition)
+        +enterInitialState()
+    }
+    note for FiniteStateMachine "總控中心\n事件分派與狀態切換"
+
+    class State {
+        +id: String
+        +entryAction: Action
+        +exitAction: Action
+        +enter()
+        +exit()
+    }
+    note for State "現在在哪\n進出時做什麼"
+
+    class Event {
+        +name: String
+        +payload: Map<String, Object>
+        +getName()
+        +getPayload()
+    }
+    note for Event "外界發生了什麼事"
+
+    class Trigger {
+        +acceptedEvent: Event
+        +fromState: State
+        +guard: Guard
+        +transition: Transition
+        +match(event: Event, state: State)
+        +fire(context: TransitionContext)
+    }
+    note for Trigger "事件到轉移的啟動器"
+
+    class Transition {
+        +from: State
+        +to: State
+        +event: Event
+        +guard: Guard
+        +action: Action
+        +canTrigger(event: Event, state: State, context: TransitionContext)
+        +execute(context: TransitionContext)
+    }
+    note for Transition "A 到 B 的一條轉移規則"
+
+    %% ------------------------------------------------------------
+    %% Guard / Action 介面
+    %% ------------------------------------------------------------
+    class Guard {
+        <<interface>>
+        +evaluate(context: TransitionContext) bool
+    }
+    note for Guard "轉移前的條件判斷器"
+
+    class Action {
+        <<interface>>
+        +execute(context: TransitionContext) void
+    }
+    note for Action "轉移成立後真正做的事"
+
+    %% ------------------------------------------------------------
+    %% 共用資料上下文
+    %% ------------------------------------------------------------
     class TransitionContext {
         +sourceId: String
         +content: String
@@ -30,42 +87,61 @@ classDiagram
         +voiceMessage: VoiceMessage
         +receiver: Object
     }
+    note for TransitionContext "Guard/Action 共用資料倉庫"
 
-    note for TransitionContext "[CTX1]"
-
-    %% ---------------------------------------------------------------
+    %% ------------------------------------------------------------
     %% Guard 家族（策略模式）
-    %% ---------------------------------------------------------------
-    class Guard {
-        <<interface>>
-        +evaluate(context: TransitionContext) bool
-    }
-
-    note for Guard "[G0]"
-
+    %% ------------------------------------------------------------
     class RoleGuard {
         +requiredRole: Role
         +evaluate(context: TransitionContext) bool
     }
-    note for RoleGuard "[G1]"
+    note for RoleGuard "角色門禁"
 
     class QuotaGuard {
         +requiredAmount: int
         +evaluate(context: TransitionContext) bool
     }
-    note for QuotaGuard "[G2]"
+    note for QuotaGuard "額度門禁"
 
     class RecorderGuard {
         +evaluate(context: TransitionContext) bool
     }
-    note for RecorderGuard "[G3]"
+    note for RecorderGuard "錄音者身份門禁"
 
     class ParticipantCountGuard {
         +threshold: int
         +comparator: Comparator
         +evaluate(context: TransitionContext) bool
     }
-    note for ParticipantCountGuard "[G4]"
+    note for ParticipantCountGuard "在線人數門檻"
+
+    class BroadcastingGuard {
+        +expected: bool
+        +evaluate(context: TransitionContext) bool
+    }
+    note for BroadcastingGuard "廣播狀態判斷"
+
+    class GameFinishedGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for GameFinishedGuard "知識王遊戲是否結束"
+
+    class GameTimeoutGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for GameTimeoutGuard "知識王是否超時"
+
+    class AnswerCorrectGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for AnswerCorrectGuard "答案是否正確"
+
+    class StateDurationGuard {
+        +thresholdSeconds: int
+        +evaluate(context: TransitionContext) bool
+    }
+    note for StateDurationGuard "狀態停留時間是否達門檻"
 
     class Comparator {
         <<enumeration>>
@@ -73,209 +149,103 @@ classDiagram
         LT
     }
 
-    class AndGuard {
-        +guards: List~Guard~
-        +evaluate(context: TransitionContext) bool
-    }
-    note for AndGuard "[G5]"
-
-    class BroadcastingGuard {
-        +expected: bool
-        +evaluate(context: TransitionContext) bool
-    }
-    note for BroadcastingGuard "[G6]"
-
-    class GameFinishedGuard {
-        +evaluate(context: TransitionContext) bool
-    }
-    note for GameFinishedGuard "[G7]"
-
-    class GameTimeoutGuard {
-        +evaluate(context: TransitionContext) bool
-    }
-    note for GameTimeoutGuard "[G8]"
-
-    class AnswerCorrectGuard {
-        +evaluate(context: TransitionContext) bool
-    }
-    note for AnswerCorrectGuard "[G9]"
-
-    class StateDurationGuard {
-        +thresholdSeconds: int
-        +evaluate(context: TransitionContext) bool
-    }
-    note for StateDurationGuard "[G10]"
-
     Guard <|.. RoleGuard
     Guard <|.. QuotaGuard
     Guard <|.. RecorderGuard
     Guard <|.. ParticipantCountGuard
-    Guard <|.. AndGuard
     Guard <|.. BroadcastingGuard
     Guard <|.. GameFinishedGuard
     Guard <|.. GameTimeoutGuard
     Guard <|.. AnswerCorrectGuard
     Guard <|.. StateDurationGuard
-    AndGuard "1" o-- "2..*" Guard : 組合子條件
     ParticipantCountGuard "1" --> "1" Comparator : 使用
     Guard ..> TransitionContext : 讀取
-    GameFinishedGuard ..> KnowledgeKingGame : 讀取 isFinished()
-    GameTimeoutGuard ..> KnowledgeKingGame : 讀取 isTimeout()
-    AnswerCorrectGuard ..> KnowledgeKingGame : 呼叫 submitAnswer()（有副作用）
 
-    %% ---------------------------------------------------------------
+    %% ------------------------------------------------------------
     %% Action 家族（命令模式）
-    %% ---------------------------------------------------------------
-    class Action {
-        <<interface>>
-        +execute(context: TransitionContext) void
-    }
-    note for Action "[A0]"
-
+    %% ------------------------------------------------------------
     class DeductQuotaAction {
         +amount: int
         +execute(context: TransitionContext) void
     }
-    note for DeductQuotaAction "[A1]"
+    note for DeductQuotaAction "扣額度"
 
     class ReplyChatMessageAction {
         +content: String
         +execute(context: TransitionContext) void
     }
-    note for ReplyChatMessageAction "[A2]"
+    note for ReplyChatMessageAction "聊天室回覆"
 
     class CommentOnPostAction {
         +content: String
         +tagAllOnline: bool
         +execute(context: TransitionContext) void
     }
-    note for CommentOnPostAction "[A3]"
+    note for CommentOnPostAction "發表論壇留言"
 
     class BroadcastVoiceAction {
         +content: String
         +execute(context: TransitionContext) void
     }
-    note for BroadcastVoiceAction "[A4]"
-
-    class CompositeAction {
-        +actions: List~Action~
-        +execute(context: TransitionContext) void
-    }
-    note for CompositeAction "[A5]"
-
-    class ConditionalAction {
-        +guard: Guard
-        +thenAction: Action
-        +elseAction: Action
-        +execute(context: TransitionContext) void
-    }
-    note for ConditionalAction "[A6]"
-
-    class NoOpAction {
-        +execute(context: TransitionContext) void
-    }
-    note for NoOpAction "[A7]"
+    note for BroadcastVoiceAction "廣播語音內容"
 
     class CreateRecordingSessionAction {
         +execute(context: TransitionContext) void
     }
-    note for CreateRecordingSessionAction "[A8]"
+    note for CreateRecordingSessionAction "建立錄音 Session"
 
     class CreateKnowledgeKingGameAction {
         +execute(context: TransitionContext) void
     }
-    note for CreateKnowledgeKingGameAction "[A9]"
+    note for CreateKnowledgeKingGameAction "建立知識王遊戲"
 
     class AddVoiceMessageAction {
         +execute(context: TransitionContext) void
     }
-    note for AddVoiceMessageAction "[A10]"
+    note for AddVoiceMessageAction "追加語音訊息"
 
     class ResetReplyCycleAction {
         +execute(context: TransitionContext) void
     }
-    note for ResetReplyCycleAction "[A11]"
-
-    class ReplyNextCycleMessageAction {
-        +execute(context: TransitionContext) void
-    }
-    note for ReplyNextCycleMessageAction "[A12]"
-
-    class ReplyCurrentQuestionAction {
-        +execute(context: TransitionContext) void
-    }
-    note for ReplyCurrentQuestionAction "[A13]"
-
-    class ReplyRecordingReplayAction {
-        +execute(context: TransitionContext) void
-    }
-    note for ReplyRecordingReplayAction "[A14]"
-
-    class AnnounceWinnerByVoiceAction {
-        +execute(context: TransitionContext) void
-    }
-    note for AnnounceWinnerByVoiceAction "[A15]"
-
-    class AnnounceWinnerByChatAction {
-        +execute(context: TransitionContext) void
-    }
-    note for AnnounceWinnerByChatAction "[A16]"
+    note for ResetReplyCycleAction "重設對話輪播"
 
     Action <|.. DeductQuotaAction
     Action <|.. ReplyChatMessageAction
     Action <|.. CommentOnPostAction
     Action <|.. BroadcastVoiceAction
-    Action <|.. CompositeAction
-    Action <|.. ConditionalAction
-    Action <|.. NoOpAction
     Action <|.. CreateRecordingSessionAction
     Action <|.. CreateKnowledgeKingGameAction
     Action <|.. AddVoiceMessageAction
     Action <|.. ResetReplyCycleAction
-    Action <|.. ReplyNextCycleMessageAction
-    Action <|.. ReplyCurrentQuestionAction
-    Action <|.. ReplyRecordingReplayAction
-    Action <|.. AnnounceWinnerByVoiceAction
-    Action <|.. AnnounceWinnerByChatAction
-    CompositeAction "1" o-- "2..*" Action : 依序組合子行為
-    ConditionalAction "1" --> "1" Guard : 判斷走哪一分支
-    ConditionalAction "1" o-- "2" Action : thenAction / elseAction
     Action ..> TransitionContext : 讀取/寫入
-    CreateRecordingSessionAction ..> RecordingSession : 建立並寫回 context.session
-    CreateKnowledgeKingGameAction ..> KnowledgeKingGame : 建立並寫回 context.game
-    AddVoiceMessageAction ..> RecordingSession : 呼叫 addVoice()
-    ReplyCurrentQuestionAction ..> KnowledgeKingGame : 讀取 getCurrentQuestion()
-    ReplyRecordingReplayAction ..> RecordingSession : 讀取 generateReplay()
-    AnnounceWinnerByVoiceAction ..> KnowledgeKingGame : 讀取 getWinner()
-    AnnounceWinnerByChatAction ..> KnowledgeKingGame : 讀取 getWinner()
 
-    %% ---------------------------------------------------------------
-    %% 外部領域類別 stub（完整定義見 OOA-Clean.mmd，這裡只列出名稱以呈現互動關係）
-    %% ---------------------------------------------------------------
-    class RecordingSession {
-        +recorderId: String
-        +addVoice(message: VoiceMessage) void
-        +generateReplay() String
-    }
-    class KnowledgeKingGame {
-        +submitAnswer(memberId: String, answer: String) bool
-        +isFinished() bool
-        +isTimeout(currentTime: DateTime) bool
-        +getWinner() String
-        +getCurrentQuestion() Question
-    }
-    class Question {
-        +description: String
-    }
-    class VoiceMessage {
-        +speakerId: String
-        +content: String
-    }
     class Role {
         <<enumeration>>
         ADMIN
         MEMBER
     }
 
-    note for RecordingSession "[D1]"
-    note for KnowledgeKingGame "[D2]"
+    %% ------------------------------------------------------------
+    %% 核心互動關係
+    %% ------------------------------------------------------------
+    FiniteStateMachine --> State : currentState
+    FiniteStateMachine --> Transition : 管理規則
+    FiniteStateMachine ..> Event : dispatch(event)
+    FiniteStateMachine ..> Trigger : 觸發檢查
+
+    Transition --> State : from / to
+    Transition --> Event : event
+    Transition --> Guard : guard
+    Transition --> Action : action
+
+    Trigger --> Event : acceptedEvent
+    Trigger --> State : fromState
+    Trigger --> Guard : guard
+    Trigger --> Transition : transition
+
+    State --> Action : entryAction / exitAction
+    Guard ..> TransitionContext : evaluate(ctx)
+    Action ..> TransitionContext : execute(ctx)
+    TransitionContext --> Role : role
+    TransitionContext --> Comparator : 比較條件資料
+
