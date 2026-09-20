@@ -1,0 +1,78 @@
+stateDiagram-v2
+    direction TB
+
+    [*] --> Normal
+
+    %% ==========================================
+    %% 1. 正常狀態 (Normal CompositeState)
+    %% ==========================================
+    state "Normal" as Normal {
+        [*] --> DefaultConversation: [WaterballCommunity.getOnlineCount() < 10]
+        [*] --> Interacting: [WaterballCommunity.getOnlineCount() >= 10]
+
+        state "Default Conversation" as DefaultConversation
+        state "Interacting" as Interacting
+
+        DefaultConversation: entry / Bot.resetReplyCycle()
+        DefaultConversation: onMessageReceived(msg) / Bot.replyChatMessage(Bot.getNextReplyMessage(), [msg.authorId])
+        DefaultConversation: onPostPublished(post) / Bot.commentPost(post.id, "Nice post", [post.authorId])
+
+        Interacting: entry / Bot.resetReplyCycle()
+        Interacting: onMessageReceived(msg) / Bot.replyChatMessage(Bot.getNextReplyMessage(), [msg.authorId])
+        Interacting: onPostPublished(post) / Bot.commentPost(post.id, "How do you guys think about it?", WaterballCommunity.getOnlineParticipants())
+
+        DefaultConversation --> Interacting: login [WaterballCommunity.getOnlineCount() >= 10]
+        Interacting --> DefaultConversation: logout [WaterballCommunity.getOnlineCount() < 10]
+    }
+
+    %% ==========================================
+    %% 2. 錄音狀態 (Record CompositeState)
+    %% ==========================================
+    state "Record" as Record {
+        [*] --> Waiting: [!Broadcast.isBroadcasting()]
+        [*] --> Recording: [Broadcast.isBroadcasting()]
+
+        state "Waiting" as Waiting
+        state "Recording" as Recording
+
+        Waiting: entry / 等待成員開始廣播
+        Recording: onVoiceSpoken(voiceMsg) / RecordingSession.addVoice(voiceMsg)
+
+        Waiting --> Recording: onBroadcastStarted(speakerId)
+        Recording --> Waiting: onBroadcastStopped(speakerId)<br/>/ Bot.replyChatMessage(RecordingSession.generateReplay(), [RecordingSession.recorderId])
+    }
+
+    %% ==========================================
+    %% 3. 知識王狀態 (KnowledgeKing CompositeState)
+    %% ==========================================
+    state "KnowledgeKing" as KnowledgeKing {
+        [*] --> Questioning: entry / Bot.replyChatMessage("KnowledgeKing is started!", []) + Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+
+        state "Questioning" as Questioning
+        state "Thanks For Joining" as ThanksForJoining
+
+        Questioning: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans)] / Bot.replyChatMessage("Congrats! you got the answer!", [author.id])
+        ThanksForJoining: entry / [!Broadcast.isBroadcasting()] Bot.broadcastVoice(KnowledgeKingGame.getWinner())
+        ThanksForJoining: entry / [Broadcast.isBroadcasting()] Bot.replyChatMessage(KnowledgeKingGame.getWinner(), [])
+
+        Questioning --> Questioning: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && !KnowledgeKingGame.isFinished()]<br/>/ Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+        Questioning --> ThanksForJoining: onMessageReceived(ans) [KnowledgeKingGame.submitAnswer(author.id, ans) && KnowledgeKingGame.isFinished()]
+        Questioning --> ThanksForJoining: onTimeElapsed(seconds) [KnowledgeKingGame.isTimeout(WaterballCommunity.currentTime)]
+
+        Questioning --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5, Bot.replyChatMessage("KnowledgeKing is gonna start again!", []), 建立 KnowledgeKingGame, Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+        ThanksForJoining --> Questioning: onMessageReceived("play again @bot") [quota >= 5]<br/>/ quota-=5, Bot.replyChatMessage("KnowledgeKing is gonna start again!", []), 建立 KnowledgeKingGame, Bot.replyChatMessage(KnowledgeKingGame.getCurrentQuestion().description, [])
+    }
+
+    %% ==========================================
+    %% 主要複合狀態間的切換 (Main State Transitions)
+    %% ==========================================
+    Normal --> Record: onMessageReceived("record @bot") [quota >= 3]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=3, 建立 RecordingSession(author)
+
+    Normal --> KnowledgeKing: onMessageReceived("king @bot") [author.role == Role.ADMIN && quota >= 5]<br/>/ Bot.replyChatMessage(Bot.getNextReplyMessage(), [author]), quota-=5, 建立 KnowledgeKingGame
+
+    Record --> Normal: onMessageReceived("stop-recording @bot") [msg.authorId == RecordingSession.recorderId]<br/>/ [若處於 Recording 狀態] Bot.replyChatMessage(RecordingSession.generateReplay(), [RecordingSession.recorderId])
+
+    KnowledgeKing --> Normal: onMessageReceived("king-stop @bot") [author.role == Role.ADMIN]
+
+    KnowledgeKing --> Normal: onTimeElapsed(20) [於 ThanksForJoining 狀態滿 20 秒]
++

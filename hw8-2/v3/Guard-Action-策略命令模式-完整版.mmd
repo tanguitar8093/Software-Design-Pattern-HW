@@ -1,0 +1,281 @@
+classDiagram
+    direction TB
+
+    %% ======================================================================
+    %% 本檔案是 Guard(策略模式)/Action(命令模式) 家族的「完整版」
+    %% 對照對象：/home/tanguitar/workspaces/dp-homework/hw8-2/v3/FSM拆解表格.md 全部 4 張轉移表
+    %% 對照結果：先前的乾淨圖(只有 RoleGuard/QuotaGuard/RecorderGuard/ParticipantCountGuard/AndGuard
+    %%          與 DeductQuotaAction/ReplyChatMessageAction/CommentOnPostAction/BroadcastVoiceAction/CompositeAction)
+    %%          尚未覆蓋所有表格列，本檔案補齊缺漏後，才是完整版。
+    %% 本檔案只處理 Guard/Action 兩個策略/命令家族本身，不含 Transition、FiniteStateMachine
+    %% （這兩者依前一輪討論結論，不需要套用策略/命令模式，將於下一步接線時另外設計）
+    %% ======================================================================
+
+    %% ---------------------------------------------------------------
+    %% TransitionContext：Guard/Action 存取轉移相關資料的唯一管道
+    %% ---------------------------------------------------------------
+    class TransitionContext {
+        +sourceId: String
+        +content: String
+        +role: Role
+        +quota: int
+        +onlineCount: int
+        +recorderId: String
+        +isBroadcasting: bool
+        +stateEnteredAt: DateTime
+        +currentTime: DateTime
+        +postId: String
+        +game: KnowledgeKingGame
+        +session: RecordingSession
+        +voiceMessage: VoiceMessage
+        +receiver: Object
+    }
+
+    note for TransitionContext "[CTX1]"
+
+    %% ---------------------------------------------------------------
+    %% Guard 家族（策略模式）
+    %% ---------------------------------------------------------------
+    class Guard {
+        <<interface>>
+        +evaluate(context: TransitionContext) bool
+    }
+
+    note for Guard "[G0]"
+
+    class RoleGuard {
+        +requiredRole: Role
+        +evaluate(context: TransitionContext) bool
+    }
+    note for RoleGuard "[G1]"
+
+    class QuotaGuard {
+        +requiredAmount: int
+        +evaluate(context: TransitionContext) bool
+    }
+    note for QuotaGuard "[G2]"
+
+    class RecorderGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for RecorderGuard "[G3]"
+
+    class ParticipantCountGuard {
+        +threshold: int
+        +comparator: Comparator
+        +evaluate(context: TransitionContext) bool
+    }
+    note for ParticipantCountGuard "[G4]"
+
+    class Comparator {
+        <<enumeration>>
+        GTE
+        LT
+    }
+
+    class AndGuard {
+        +guards: List~Guard~
+        +evaluate(context: TransitionContext) bool
+    }
+    note for AndGuard "[G5]"
+
+    class BroadcastingGuard {
+        +expected: bool
+        +evaluate(context: TransitionContext) bool
+    }
+    note for BroadcastingGuard "[G6]"
+
+    class GameFinishedGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for GameFinishedGuard "[G7]"
+
+    class GameTimeoutGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for GameTimeoutGuard "[G8]"
+
+    class AnswerCorrectGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+    note for AnswerCorrectGuard "[G9]"
+
+    class StateDurationGuard {
+        +thresholdSeconds: int
+        +evaluate(context: TransitionContext) bool
+    }
+    note for StateDurationGuard "[G10]"
+
+    Guard <|.. RoleGuard
+    Guard <|.. QuotaGuard
+    Guard <|.. RecorderGuard
+    Guard <|.. ParticipantCountGuard
+    Guard <|.. AndGuard
+    Guard <|.. BroadcastingGuard
+    Guard <|.. GameFinishedGuard
+    Guard <|.. GameTimeoutGuard
+    Guard <|.. AnswerCorrectGuard
+    Guard <|.. StateDurationGuard
+    AndGuard "1" o-- "2..*" Guard : 組合子條件
+    ParticipantCountGuard "1" --> "1" Comparator : 使用
+    Guard ..> TransitionContext : 讀取
+    GameFinishedGuard ..> KnowledgeKingGame : 讀取 isFinished()
+    GameTimeoutGuard ..> KnowledgeKingGame : 讀取 isTimeout()
+    AnswerCorrectGuard ..> KnowledgeKingGame : 呼叫 submitAnswer()（有副作用）
+
+    %% ---------------------------------------------------------------
+    %% Action 家族（命令模式）
+    %% ---------------------------------------------------------------
+    class Action {
+        <<interface>>
+        +execute(context: TransitionContext) void
+    }
+    note for Action "[A0]"
+
+    class DeductQuotaAction {
+        +amount: int
+        +execute(context: TransitionContext) void
+    }
+    note for DeductQuotaAction "[A1]"
+
+    class ReplyChatMessageAction {
+        +content: String
+        +execute(context: TransitionContext) void
+    }
+    note for ReplyChatMessageAction "[A2]"
+
+    class CommentOnPostAction {
+        +content: String
+        +tagAllOnline: bool
+        +execute(context: TransitionContext) void
+    }
+    note for CommentOnPostAction "[A3]"
+
+    class BroadcastVoiceAction {
+        +content: String
+        +execute(context: TransitionContext) void
+    }
+    note for BroadcastVoiceAction "[A4]"
+
+    class CompositeAction {
+        +actions: List~Action~
+        +execute(context: TransitionContext) void
+    }
+    note for CompositeAction "[A5]"
+
+    class ConditionalAction {
+        +guard: Guard
+        +thenAction: Action
+        +elseAction: Action
+        +execute(context: TransitionContext) void
+    }
+    note for ConditionalAction "[A6]"
+
+    class NoOpAction {
+        +execute(context: TransitionContext) void
+    }
+    note for NoOpAction "[A7]"
+
+    class CreateRecordingSessionAction {
+        +execute(context: TransitionContext) void
+    }
+    note for CreateRecordingSessionAction "[A8]"
+
+    class CreateKnowledgeKingGameAction {
+        +execute(context: TransitionContext) void
+    }
+    note for CreateKnowledgeKingGameAction "[A9]"
+
+    class AddVoiceMessageAction {
+        +execute(context: TransitionContext) void
+    }
+    note for AddVoiceMessageAction "[A10]"
+
+    class ResetReplyCycleAction {
+        +execute(context: TransitionContext) void
+    }
+    note for ResetReplyCycleAction "[A11]"
+
+    class ReplyNextCycleMessageAction {
+        +execute(context: TransitionContext) void
+    }
+    note for ReplyNextCycleMessageAction "[A12]"
+
+    class ReplyCurrentQuestionAction {
+        +execute(context: TransitionContext) void
+    }
+    note for ReplyCurrentQuestionAction "[A13]"
+
+    class ReplyRecordingReplayAction {
+        +execute(context: TransitionContext) void
+    }
+    note for ReplyRecordingReplayAction "[A14]"
+
+    class AnnounceWinnerByVoiceAction {
+        +execute(context: TransitionContext) void
+    }
+    note for AnnounceWinnerByVoiceAction "[A15]"
+
+    class AnnounceWinnerByChatAction {
+        +execute(context: TransitionContext) void
+    }
+    note for AnnounceWinnerByChatAction "[A16]"
+
+    Action <|.. DeductQuotaAction
+    Action <|.. ReplyChatMessageAction
+    Action <|.. CommentOnPostAction
+    Action <|.. BroadcastVoiceAction
+    Action <|.. CompositeAction
+    Action <|.. ConditionalAction
+    Action <|.. NoOpAction
+    Action <|.. CreateRecordingSessionAction
+    Action <|.. CreateKnowledgeKingGameAction
+    Action <|.. AddVoiceMessageAction
+    Action <|.. ResetReplyCycleAction
+    Action <|.. ReplyNextCycleMessageAction
+    Action <|.. ReplyCurrentQuestionAction
+    Action <|.. ReplyRecordingReplayAction
+    Action <|.. AnnounceWinnerByVoiceAction
+    Action <|.. AnnounceWinnerByChatAction
+    CompositeAction "1" o-- "2..*" Action : 依序組合子行為
+    ConditionalAction "1" --> "1" Guard : 判斷走哪一分支
+    ConditionalAction "1" o-- "2" Action : thenAction / elseAction
+    Action ..> TransitionContext : 讀取/寫入
+    CreateRecordingSessionAction ..> RecordingSession : 建立並寫回 context.session
+    CreateKnowledgeKingGameAction ..> KnowledgeKingGame : 建立並寫回 context.game
+    AddVoiceMessageAction ..> RecordingSession : 呼叫 addVoice()
+    ReplyCurrentQuestionAction ..> KnowledgeKingGame : 讀取 getCurrentQuestion()
+    ReplyRecordingReplayAction ..> RecordingSession : 讀取 generateReplay()
+    AnnounceWinnerByVoiceAction ..> KnowledgeKingGame : 讀取 getWinner()
+    AnnounceWinnerByChatAction ..> KnowledgeKingGame : 讀取 getWinner()
+
+    %% ---------------------------------------------------------------
+    %% 外部領域類別 stub（完整定義見 OOA-Clean.mmd，這裡只列出名稱以呈現互動關係）
+    %% ---------------------------------------------------------------
+    class RecordingSession {
+        +recorderId: String
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() String
+    }
+    class KnowledgeKingGame {
+        +submitAnswer(memberId: String, answer: String) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() String
+        +getCurrentQuestion() Question
+    }
+    class Question {
+        +description: String
+    }
+    class VoiceMessage {
+        +speakerId: String
+        +content: String
+    }
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    note for RecordingSession "[D1]"
+    note for KnowledgeKingGame "[D2]"

@@ -1,0 +1,80 @@
+Fsm
+
+Context
+1.
+當機器人在某個狀態下，發生什麼事情後，如果符合何等條件，則會做哪些事的邏輯。
+這樣的邏輯不斷重複, 使程式碼單純充斥著各式各樣的曹狀 If-else 條件式。
+重複的部分: 狀態 (State)」和「轉移 (Transition)」這兩者元素交互的邏輯
+
+forces: 
+若機器人在某種狀態 (State) 下時，發生某個事件 (Event)，此時若某種條件 (Guard) 達成，
+機器人會觸發 (Trigger) 轉移 (Transition) 到另外一個狀態。
+
+當機器人進入此狀態時，會先做「進場行為 (Entry Action)」；
+而當機器人離開此狀態時，則會做「出場行為 (Exit Action)」。
+
+solution
+fsm design
+
+FiniteStateMachine
+Event
+Guard
+Trigger
+Action
+State(enter: State,exit: State)
+Transition(from: State, event: Event, guard: Guard , to: State)
+
+
+獨立模組
+一堆類別和介面的集合
+不知曉「社群機器人」這個概念
+
+OCP
+當 Client 在從事以下維護/開發行為時，無需修改 FSM 模組的既有程式碼：
+調整狀態之間的轉移 (Transition) 邏輯
+擴充新的狀態
+擴充新的 Trigger、Guard、Action
+
+Sub-state machine
+支援「有限狀態機中有子狀態機」的功能
+支援「任何深度」，如子狀態機、子子狀態機、子子子狀態機
+支援/取消「子狀態機」相關功能時，能不修改既有 FiniteStateMachine（以及其實作類別）的程式碼。
+將此功能設計成插件 (Plugin)給 Client 引入該插件依賴後使用
+
+resultContext
+允許開發者輕鬆建立有限狀態機，並能注入開發者想要的行為至有限狀態機中。
+
+
+State
+Normal
+    DefaultConversationState
+    InteractingState
+Record
+    Wating
+    Recording
+KnowledgeKing
+    QuestioningState
+    ThanksForJoiningState
+
+
+Guard
+Normal 子狀態
+    DefaultConversationState
+        Trigger: 進入 Normal 狀態後 or 成員登出 
+        Guard: 線上人數 < 10 
+        Action: 
+    InteractingState
+        Trigger: 進入 Normal 狀態後 or 成員登入
+        Guard: 線上人數 >=10 
+        Action: 
+人數
+
+Record 子狀態
+無人廣報 or Recording 狀態下結束廣播 => wating
+進入 Record 狀態後直接廣播 or 從 wating 狀態開始廣播 => Recording
+
+廣播動作狀態
+
+kingKnowledge
+進入kingKnowledge的初始狀態: Questioning
+play again@bot and 額度 >=5

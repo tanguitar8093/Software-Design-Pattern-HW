@@ -221,6 +221,110 @@ classDiagram
         +isCorrect(answer: String) bool
     }
 
+    %% ======================= [v3-STEP1] 策略模式 (Strategy Pattern) - FSM Guard =======================
+    %% Force-通用性：FSM 模組不可認識「額度」「管理員」「在線人數」等 Waterball 社群業務概念
+    %% Force-擴充性：擴充新的 <Guard> 條件時，不必修改既有 <Transition>/<FiniteStateMachine>（本步驟尚未建立這兩者，將於後續步驟接上）
+    %% 依據(README原文)：「FSM 模組並不知曉『社群機器人』這個概念」「擴充新的 Trigger、Guard、Action⋯無需修改 FSM 模組的既有程式碼」
+
+    %% ======================= [v3-STEP2] 命令模式 (Command Pattern) - FSM Action =======================
+    %% Force-通用性：FSM 模組不可認識「扣額度」「回覆訊息」「留言」「廣播語音」等具體副作用內容
+    %% Force-擴充性：擴充新的 <Action> 行為時，不必修改既有 <Transition>/<State>/<FiniteStateMachine>
+    %% Force-可組合性：Entry Action / Exit Action / Transition Action 可能需要依序執行多個副作用
+    %% 依據(README原文)：「當機器人進入此狀態時，會先做『進場行為』；離開此狀態時，則做『出場行為』」「擴充新的 Trigger、Guard、Action⋯無需修改 FSM 模組的既有程式碼」
+
+    class TransitionContext {
+        +sourceId: String
+        +role: Role
+        +quota: int
+        +onlineCount: int
+        +recorderId: String
+        +receiver: Object
+    }
+
+    note for TransitionContext "【FSM 與業務資料的橋樑】TransitionContext 是 Guard/Action 存取轉移相關資料的唯一管道，由應用層在事件發生當下組裝後傳入；FSM 模組本身不需要知道這些欄位分別代表什麼業務意義，只單純轉手傳遞。<br/>【receiver 欄位(Command模式的Receiver)】receiver 是一個不具型別的通用參考(此處為 Bot 實例)，具體 Action 實作會將其向下轉型後呼叫對應方法(如 receiver.replyChatMessage())，FSM 核心與 Guard/Action 介面本身都不需要知道 receiver 實際型別"
+
+    class Action {
+        <<interface>>
+        +execute(context: TransitionContext) void
+    }
+
+    note for Action "【命令模式(Command Pattern)】Action 是 FSM 模組唯一認識的抽象行為介面，對應 README 中 Entry Action / Exit Action / Transition Action 三種呼叫時機；具體副作用(扣額度/回覆訊息/留言/廣播語音)由應用層實作為不同的 Action，FSM 核心只呼叫 execute()，新增行為不需修改既有程式碼"
+
+    class DeductQuotaAction {
+        +amount: int
+        +execute(context: TransitionContext) void
+    }
+
+    class ReplyChatMessageAction {
+        +content: String
+        +execute(context: TransitionContext) void
+    }
+
+    class CommentOnPostAction {
+        +content: String
+        +execute(context: TransitionContext) void
+    }
+
+    class BroadcastVoiceAction {
+        +content: String
+        +execute(context: TransitionContext) void
+    }
+
+    class CompositeAction {
+        +actions: List~Action~
+        +execute(context: TransitionContext) void
+    }
+
+    note for DeductQuotaAction "對應 README：king(額度5) / record(額度3) / play again(額度5) 指令觸發轉移時扣除對應額度；execute() 內部對 context.receiver(Bot) 執行 quota -= amount"
+    note for ReplyChatMessageAction "對應 README：如「KnowledgeKing is started!」「KnowledgeKing is gonna start again!」等固定訊息回覆；execute() 呼叫 receiver.replyChatMessage(content, tags)"
+    note for CommentOnPostAction "對應 README：如貼文底下留言『Nice post』；execute() 呼叫 receiver.commentPost(postId, content, tags)"
+    note for BroadcastVoiceAction "對應 README：感謝參與狀態透過語音公布遊戲結果；execute() 呼叫 receiver.broadcastVoice(content)"
+    note for CompositeAction "【命令組合】用於同一次轉移需要依序執行多個副作用，例如某條轉移同時要「扣額度」+「回覆訊息」，對應 AndGuard 在 Guard 家族中的組合角色"
+
+    class Guard {
+        <<interface>>
+        +evaluate(context: TransitionContext) bool
+    }
+
+    note for Guard "【策略模式】Guard 是 FSM 模組唯一認識的抽象條件介面。具體判斷邏輯(額度/身分/人數/錄音者)由應用層實作為不同的 Guard，FSM 核心只呼叫 evaluate()，新增條件不需修改既有程式碼"
+
+    class RoleGuard {
+        +requiredRole: Role
+        +evaluate(context: TransitionContext) bool
+    }
+
+    class QuotaGuard {
+        +requiredAmount: int
+        +evaluate(context: TransitionContext) bool
+    }
+
+    class RecorderGuard {
+        +evaluate(context: TransitionContext) bool
+    }
+
+    class ParticipantCountGuard {
+        +threshold: int
+        +comparator: Comparator
+        +evaluate(context: TransitionContext) bool
+    }
+
+    class Comparator {
+        <<enumeration>>
+        GTE
+        LT
+    }
+
+    class AndGuard {
+        +guards: List~Guard~
+        +evaluate(context: TransitionContext) bool
+    }
+
+    note for RoleGuard "對應 README：king / king-stop 指令『只有管理員方可使用』"
+    note for QuotaGuard "對應 README：king(額度5) / record(額度3) / play again(額度5) 等指令的額度門檻檢查"
+    note for RecorderGuard "對應 README：stop-recording『只有錄音者方可使用』；evaluate() 內部比對 context.sourceId == context.recorderId"
+    note for ParticipantCountGuard "對應 README：登入後在線人數 >= 10 進互動狀態(comparator=GTE)；登出後在線人數 < 10 回預設對話狀態(comparator=LT)"
+    note for AndGuard "【策略組合】用於同時滿足多個條件，例如 king 指令需要「RoleGuard(ADMIN) 且 QuotaGuard(5)」同時成立時才觸發轉移"
+
     %% 觀察者模式關係
     DomainEvent <|.. MessagePostedEvent
     DomainEvent <|.. PostCreatedEvent
@@ -254,6 +358,25 @@ classDiagram
     RecordingState "1" *-- "1" RecordingSession
     QuestioningState "1" *-- "1" KnowledgeKingGame
     ThanksForJoiningState "1" --> "1" KnowledgeKingGame
+
+    %% [v3-STEP1] 策略模式關係
+    Guard <|.. RoleGuard
+    Guard <|.. QuotaGuard
+    Guard <|.. RecorderGuard
+    Guard <|.. ParticipantCountGuard
+    Guard <|.. AndGuard
+    AndGuard "1" o-- "2..*" Guard : 組合子條件
+    ParticipantCountGuard "1" --> "1" Comparator : 使用
+    Guard ..> TransitionContext : 讀取(evaluate 參數)
+
+    %% [v3-STEP2] 命令模式關係
+    Action <|.. DeductQuotaAction
+    Action <|.. ReplyChatMessageAction
+    Action <|.. CommentOnPostAction
+    Action <|.. BroadcastVoiceAction
+    Action <|.. CompositeAction
+    CompositeAction "1" o-- "2..*" Action : 依序組合子行為
+    Action ..> TransitionContext : 讀取/寫入(execute 參數)
 
     %% 繼承關係
     Participant <|-- Member
@@ -291,7 +414,7 @@ classDiagram
 
     note for WaterballCommunity "【WaterballCommunity 擁有唯一的 EventPublisher】<br/>login/logout/elapseTime 完成後會呼叫自己組合持有的 EventPublisher 之 notify(LoginEvent)/notify(LogoutEvent)/notify(TimeElapsedEvent)；同時也是 ChatRoom/Forum/Broadcast 共用同一顆 EventPublisher 的來源"
 
-    note for Bot "【Bot 觀察者行為】<br/>1. Bot 實作 CommunityObserver，只需向 WaterballCommunity 持有的那一顆 EventPublisher 註冊一次 register(this)，即可收到 ChatRoom/Forum/Broadcast/WaterballCommunity 四方共用同一發布中心送出的所有事件<br/>2. 任何 DomainEvent 發生時，onEvent(event) 皆會被統一呼叫，不需關心事件來源<br/>【Bot 狀態委派行為】<br/>3. onEvent(event) 內部委派給 currentState.onEvent(this, event) 處理，依當前狀態產生不同回應<br/>4. 狀態處理完畢後可能呼叫 transitionTo(newState) 切換至下一狀態"
+    note for Bot "【Bot 觀察者行為】<br/>1. Bot 實作 CommunityObserver，只需向 WaterballCommunity 持有的那一顆 EventPublisher 註冊一次 register(this)，即可收到 ChatRoom/Forum/Broadcast/WaterballCommunity 四方共用同一發布中心送出的所有事件<br/>2. 任何 DomainEvent 發生時，onEvent(event) 皆會被統一呼叫，不需關心事件來源<br/>【Bot 狀態委派行為】<br/>3. onEvent(event) 內部委派給 currentState.onEvent(this, event) 處理，依當前狀態產生不同回應<br/>4. 狀態處理完畢後可能呼叫 transitionTo(newState) 切換至下一狀態<br/>【v3 現況】5. Bot/BotState 本次尚未接上 Guard/Action，權限/額度判斷與副作用執行邏輯仍暫留在 v2 原本位置，等步驟 3(Transition)、步驟 5(FiniteStateMachine) 建立後才會將這些邏輯改委派給 Guard/Action"
 
     note for BotState "【BotState 互動行為】<br/>1. 各具體狀態依事件類型（MessagePostedEvent/PostCreatedEvent/VoiceSpokenEvent/LoginEvent...）判斷是否為指令、是否符合權限與額度，決定呼叫 Bot.replyChatMessage()/commentPost()/broadcastVoice() 或 transitionTo()<br/>2. RecordingState 持有 RecordingSession 收音；QuestioningState 持有 KnowledgeKingGame 主持答題"
 
