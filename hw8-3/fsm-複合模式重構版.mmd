@@ -1,0 +1,93 @@
+classDiagram
+    direction LR
+
+    %% ======================= Component =======================
+    class State {
+        <<interface>>
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    %% ======================= Leaf =======================
+    class LeafState {
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    %% ======================= Composite =======================
+    class CompositeState {
+        -innerFsm: FiniteStateMachine
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class FiniteStateMachine {
+        -currentState: State
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +fire(event: Event) bool
+    }
+
+    class Event {
+        +name: String
+    }
+
+    class Trigger {
+        +isTriggeredBy(event: Event) bool
+    }
+
+    class Guard {
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        +execute(event: Event) None
+    }
+
+    class Transition {
+        +from: State
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: State
+        +isApplicable(currentState: State, event: Event) bool
+    }
+
+    %% ======================= 核心 FSM 關係（既有，未修改型別）=======================
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine ..> Event : receives
+    FiniteStateMachine ..> State : calls onExit / onEnter
+    FiniteStateMachine ..> Action : executes transition action
+
+    Transition "1" --> "1" State : from
+    Transition "1" --> "1" State : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    Trigger ..> Event : identifies
+    Guard ..> Event : evaluates
+    State "1" --> "0..1" Action : entry action
+    State "1" --> "0..1" Action : exit action
+
+    %% ======================= Composite Pattern 結構 =======================
+    State <|.. LeafState : Leaf 實作 Component
+    State <|.. CompositeState : Composite 實作 Component
+    CompositeState "1" *-- "1" FiniteStateMachine : innerFsm（可再套一層 CompositeState 達成任意深度）
+
+    note for State "Component：宣告 fire(event): bool，讓 Leaf 與 Composite 都能被 FiniteStateMachine 統一呼叫，不需 instanceof 判斷"
+    note for LeafState "Leaf：fire(event) 固定回傳 false，代表自己沒有子結構可處理，例如 King 狀態"
+    note for CompositeState "Composite：fire(event) 委派給 innerFsm.fire(event)，回傳是否有子層 Transition 被觸發，例如 Record 狀態（innerFsm 管理 Waiting/Recording）"
+    note for FiniteStateMachine "fire(event): 先呼叫 currentState.fire(event)，若為 false 才比對自己的 Transition[]；此為對 Component 介面的一次多型呼叫，FiniteStateMachine 完全不需要知道 currentState 是 LeafState 還是 CompositeState"
+
+    note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."

@@ -27,6 +27,7 @@ classDiagram
     class State {
         +enter: Action
         +exit: Action
+        +subMachine: FiniteStateMachine
         +onEnter(event: Event) None
         +onExit(event: Event) None
     }
@@ -56,6 +57,10 @@ classDiagram
     Guard ..> Event : evaluates
     State "1" --> "0..1" Action : entry action
     State "1" --> "0..1" Action : exit action
-
+    State "1" o-- "0..1" FiniteStateMachine : subMachine
     note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."
     note for FiniteStateMachine "Successful transition order: from.onExit, Transition.action.execute, update currentState, to.onEnter"
+    note for State "State 就是一個『可能藏著一台小 FSM』的狀態。
+    King 狀態沒有藏東西（subMachine 是空的），就只是一般狀態，觸發時做完 enter/exit 就結束。
+    Record 狀態裡面藏了一台小 FSM（subMachine 不是空的），這台小 FSM 自己管理 Waiting 和 Recording 兩個子狀態怎麼互相切換。
+    外面的人（FiniteStateMachine）看 King 和 Record 都只是『一個 State』，不會知道 Record 裡面其實還藏著一台小機器在運作。"

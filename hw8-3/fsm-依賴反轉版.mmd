@@ -1,0 +1,79 @@
+classDiagram
+    direction LR
+
+    %% ======================= Component（依賴反轉後的共同介面） =======================
+    class StateNode {
+        <<interface>>
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class State {
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class FiniteStateMachine {
+        -currentState: StateNode
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class Event {
+        +name: String
+    }
+
+    class Trigger {
+        +isTriggeredBy(event: Event) bool
+    }
+
+    class Guard {
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        +execute(event: Event) None
+    }
+
+    class Transition {
+        +from: StateNode
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: StateNode
+        +isApplicable(currentState: StateNode, event: Event) bool
+    }
+
+    %% ======================= 依賴反轉：State 與 FiniteStateMachine 皆實作 StateNode =======================
+    StateNode <|.. State
+    StateNode <|.. FiniteStateMachine
+
+    %% ======================= 核心 FSM 關係（型別改指向 StateNode，不再是具體 State） =======================
+    FiniteStateMachine "1" --> "1" StateNode : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine ..> Event : receives
+    FiniteStateMachine ..> StateNode : calls onExit / onEnter
+    FiniteStateMachine ..> Action : executes transition action
+
+    Transition "1" --> "1" StateNode : from
+    Transition "1" --> "1" StateNode : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    Trigger ..> Event : identifies
+    Guard ..> Event : evaluates
+    State "1" --> "0..1" Action : entry action
+    State "1" --> "0..1" Action : exit action
+
+    note for StateNode "Component：State 與 FiniteStateMachine 的共同行為契約，兩者互為平輩，不再是誰包誰的欄位關係"
+    note for State "State.fire(event) 固定回傳 false：單純狀態沒有自己的 Transition[] 可比對，轉移邏輯屬於外層 FiniteStateMachine"
+    note for FiniteStateMachine "FiniteStateMachine.onEnter(event): 呼叫 currentState.onEnter(event)（啟動初始子狀態）\nonExit(event): 呼叫 currentState.onExit(event)（讓目前子狀態離場）\nfire(event): 比對自己的 Transition[]，回傳是否有轉移被觸發\n因為自己也實作 StateNode，可以被直接放進另一台 FiniteStateMachine 的 currentState/Transition.from/to，形成任意深度的遞迴巢狀"
+    note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."
