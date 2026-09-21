@@ -1,0 +1,104 @@
+classDiagram
+    direction LR
+
+    class State {
+        <<abstract>>
+        +id: str
+        +onEnter(context: TransitionContext) None
+        +onExit(context: TransitionContext) None
+        +handle(context: TransitionContext) bool
+    }
+
+    class AtomicState {
+        +onEnter(context: TransitionContext) None
+        +onExit(context: TransitionContext) None
+        +handle(context: TransitionContext) bool
+    }
+
+    class CompositeState {
+        -_innerFsm: FiniteStateMachine
+        +getInnerFsm() FiniteStateMachine
+        +onEnter(context: TransitionContext) None
+        +onExit(context: TransitionContext) None
+        +handle(context: TransitionContext) bool
+    }
+
+    class FiniteStateMachine {
+        -_currentState: State
+        -_transitions: Transition[*]
+        -_plugins: FsmPlugin[*]
+        -_target: Any
+        +setTarget(target: Any) None
+        +getTarget() Any
+        +installPlugin(plugin: FsmPlugin) FiniteStateMachine
+        +uninstallPlugin(plugin: FsmPlugin) None
+        +addTransition(transition: Transition) None
+        +getCurrentState() State
+        +setCurrentState(state: State) None
+        +changeState(nextState: State, context: TransitionContext) None
+        +fire(trigger: Trigger) bool
+    }
+
+    class Trigger {
+        +name: str
+        +payload: Dict
+    }
+
+    class TransitionContext {
+        +trigger: Trigger
+        +fsm: FiniteStateMachine
+        +target: Any
+    }
+
+    class Guard {
+        <<abstract>>
+        +isSatisfied(context: TransitionContext) bool
+    }
+
+    class Action {
+        <<abstract>>
+        +execute(context: TransitionContext) None
+    }
+
+    class Transition {
+        +fromState: State
+        +toState: State
+        +triggerName: str
+        -_guard: Guard
+        -_action: Action
+        +isTriggeredBy(currentState: State, trigger: Trigger) bool
+        +isAllowed(context: TransitionContext) bool
+        +executeAction(context: TransitionContext) None
+        +tryHandle(context: TransitionContext) bool
+    }
+
+    class FsmPlugin {
+        <<abstract>>
+        +beforeStateHandle(fsm: FiniteStateMachine, context: TransitionContext) bool
+        +afterStateChanged(fsm: FiniteStateMachine, oldState: State, newState: State, context: TransitionContext) None
+    }
+
+    class SubStateMachinePlugin {
+        +beforeStateHandle(fsm: FiniteStateMachine, context: TransitionContext) bool
+        +afterStateChanged(fsm: FiniteStateMachine, oldState: State, newState: State, context: TransitionContext) None
+    }
+
+    AtomicState --|> State
+    CompositeState --|> State
+    SubStateMachinePlugin --|> FsmPlugin
+    FiniteStateMachine "1" --> "0..1" State : current state
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine "1" o-- "0..*" FsmPlugin : plugins
+    FiniteStateMachine ..> TransitionContext : creates in fire
+    TransitionContext --> Trigger : carries
+    TransitionContext --> FiniteStateMachine : identifies
+    Transition "1" --> "1" State : fromState
+    Transition "1" --> "1" State : toState
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+    CompositeState "1" *-- "1" FiniteStateMachine : inner Fsm
+    FsmPlugin ..> FiniteStateMachine : extends handling
+    SubStateMachinePlugin ..> CompositeState : delegates trigger
+
+    note for FiniteStateMachine "fire order: plugins, current State.handle, matching Transition; transition order: old onExit, Action, new onEnter"
+    note for SubStateMachinePlugin "When current state is CompositeState, delegate the trigger to its inner FSM"

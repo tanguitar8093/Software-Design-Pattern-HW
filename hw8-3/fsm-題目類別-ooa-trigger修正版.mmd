@@ -1,0 +1,61 @@
+classDiagram
+    direction LR
+
+    class FiniteStateMachine {
+        -currentState: State
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +fire(event: Event) bool
+    }
+
+    class Event {
+        +name: String
+    }
+
+    class Trigger {
+        +isTriggeredBy(event: Event) bool
+    }
+
+    class Guard {
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        +execute(event: Event) None
+    }
+
+    class State {
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+    }
+
+    class Transition {
+        +from: State
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: State
+        +isApplicable(currentState: State, event: Event) bool
+    }
+
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine ..> Event : receives
+    FiniteStateMachine ..> State : calls onExit / onEnter
+    FiniteStateMachine ..> Action : executes transition action
+
+    Transition "1" --> "1" State : from
+    Transition "1" --> "1" State : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    Trigger ..> Event : identifies
+    Guard ..> Event : evaluates
+    State "1" --> "0..1" Action : entry action
+    State "1" --> "0..1" Action : exit action
+
+    note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."
+    note for FiniteStateMachine "Successful transition order: from.onExit, Transition.action.execute, update currentState, to.onEnter"

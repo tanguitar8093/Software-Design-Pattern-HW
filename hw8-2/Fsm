@@ -1,12 +1,10 @@
 Fsm
 
-Context
 1.
 當機器人在某個狀態下，發生什麼事情後，如果符合何等條件，則會做哪些事的邏輯。
 這樣的邏輯不斷重複, 使程式碼單純充斥著各式各樣的曹狀 If-else 條件式。
 重複的部分: 狀態 (State)」和「轉移 (Transition)」這兩者元素交互的邏輯
 
-forces: 
 若機器人在某種狀態 (State) 下時，發生某個事件 (Event)，此時若某種條件 (Guard) 達成，
 機器人會觸發 (Trigger) 轉移 (Transition) 到另外一個狀態。
 
@@ -44,37 +42,3 @@ Sub-state machine
 resultContext
 允許開發者輕鬆建立有限狀態機，並能注入開發者想要的行為至有限狀態機中。
 
-
-State
-Normal
-    DefaultConversationState
-    InteractingState
-Record
-    Wating
-    Recording
-KnowledgeKing
-    QuestioningState
-    ThanksForJoiningState
-
-
-Guard
-Normal 子狀態
-    DefaultConversationState
-        Trigger: 進入 Normal 狀態後 or 成員登出 
-        Guard: 線上人數 < 10 
-        Action: 
-    InteractingState
-        Trigger: 進入 Normal 狀態後 or 成員登入
-        Guard: 線上人數 >=10 
-        Action: 
-人數
-
-Record 子狀態
-無人廣報 or Recording 狀態下結束廣播 => wating
-進入 Record 狀態後直接廣播 or 從 wating 狀態開始廣播 => Recording
-
-廣播動作狀態
-
-kingKnowledge
-進入kingKnowledge的初始狀態: Questioning
-play again@bot and 額度 >=5

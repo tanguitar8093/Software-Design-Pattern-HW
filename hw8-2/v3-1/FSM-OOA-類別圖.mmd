@@ -1,0 +1,143 @@
+classDiagram
+    direction TB
+
+    namespace FSM核心模組 {
+        class FiniteStateMachine {
+            <<interface>>
+            +initialState: State
+            +currentState: State
+            +start(context: ExecutionContext) void
+            +dispatch(event: Event, context: ExecutionContext) bool
+            +getCurrentState() State
+        }
+
+        class DefaultFiniteStateMachine {
+            +initialState: State
+            +currentState: State
+            +transitions: List~Transition~
+            +started: bool
+            +start(context: ExecutionContext) void
+            +dispatch(event: Event, context: ExecutionContext) bool
+            +addTransition(transition: Transition) void
+            +getCurrentState() State
+        }
+
+        class State {
+            +id: String
+            +entryAction: Action
+            +exitAction: Action
+            +enter(context: ExecutionContext) void
+            +exit(context: ExecutionContext) void
+        }
+
+        class Transition {
+            +source: State
+            +target: State
+            +trigger: Trigger
+            +guard: Guard
+            +action: Action
+            +isEligible(state: State, event: Event, context: ExecutionContext) bool
+            +executeAction(context: ExecutionContext) void
+        }
+
+        class Trigger {
+            <<interface>>
+            +eventName: String
+            +matches(event: Event) bool
+        }
+
+        class NamedEventTrigger {
+            +eventName: String
+            +matches(event: Event) bool
+        }
+
+        class Guard {
+            <<interface>>
+            +description: String
+            +evaluate(context: ExecutionContext) bool
+        }
+
+        class AlwaysGuard {
+            +description: String
+            +evaluate(context: ExecutionContext) bool
+        }
+
+        class Action {
+            <<interface>>
+            +description: String
+            +execute(context: ExecutionContext) void
+        }
+
+        class NoOpAction {
+            +description: String
+            +execute(context: ExecutionContext) void
+        }
+
+        class CompositeAction {
+            +description: String
+            +actions: List~Action~
+            +add(action: Action) void
+            +execute(context: ExecutionContext) void
+        }
+
+        class Event {
+            +name: String
+            +payload: Map~String,Object~
+            +get(key: String) Object
+            +has(key: String) bool
+        }
+
+        class ExecutionContext {
+            +event: Event
+            +attributes: Map~String,Object~
+            +receiver: Object
+            +get(key: String) Object
+            +put(key: String, value: Object) void
+        }
+    }
+
+    namespace 子狀態機插件 {
+        class HierarchicalFiniteStateMachine {
+            +root: FiniteStateMachine
+            +children: Map~State,FiniteStateMachine~
+            +initialState: State
+            +currentState: State
+            +start(context: ExecutionContext) void
+            +dispatch(event: Event, context: ExecutionContext) bool
+            +attach(parentState: State, child: FiniteStateMachine) void
+            +activeChild() FiniteStateMachine
+            +getCurrentState() State
+        }
+    }
+
+    FiniteStateMachine <|.. DefaultFiniteStateMachine : 預設實作
+    FiniteStateMachine <|.. HierarchicalFiniteStateMachine : 插件實作
+    Trigger <|.. NamedEventTrigger : 依事件名稱比對
+    Guard <|.. AlwaysGuard : 無條件成立
+    Action <|.. NoOpAction : 空行為
+    Action <|.. CompositeAction : 組合行為
+
+    DefaultFiniteStateMachine "1" --> "1" State : initial/current
+    DefaultFiniteStateMachine "1" o-- "0..*" Transition : 管理規則
+    Transition "0..*" --> "1" State : source
+    Transition "0..*" --> "1" State : target
+    Transition "1" --> "1" Trigger : 事件條件
+    Transition "1" --> "1" Guard : 轉移條件
+    Transition "1" --> "1" Action : 轉移行為
+    State "1" --> "1" Action : entryAction
+    State "1" --> "1" Action : exitAction
+    CompositeAction "1" o-- "1..*" Action : 依序執行
+    FiniteStateMachine ..> Event : 分派
+    FiniteStateMachine ..> ExecutionContext : 使用
+    Trigger ..> Event : 比對
+    Guard ..> ExecutionContext : 讀取
+    Action ..> ExecutionContext : 使用
+    ExecutionContext "1" --> "1" Event : 當次事件
+
+    HierarchicalFiniteStateMachine "1" o-- "1" FiniteStateMachine : 裝飾 root
+    HierarchicalFiniteStateMachine "1" o-- "0..*" FiniteStateMachine : children
+    HierarchicalFiniteStateMachine "0..*" --> "1" State : 父狀態索引
+
+    note for DefaultFiniteStateMachine "只負責一般 FSM，不知道子狀態機插件"
+    note for Transition "成立後依序執行 source.exit、action、target.enter"
+    note for HierarchicalFiniteStateMachine "先分派給作用中的子 FSM；未處理再交給 root。child 可再次使用本插件，因此支援任意深度"

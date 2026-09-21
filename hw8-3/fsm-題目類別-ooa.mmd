@@ -1,0 +1,61 @@
+classDiagram
+    direction LR
+
+    class FiniteStateMachine {
+        -currentState: State
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +fire(event: Event) bool
+    }
+
+    class Event {
+        +name: String
+    }
+
+    class Guard {
+        +description: String
+        +isSatisfied(event: Event) bool
+    }
+
+    class Trigger {
+        -action: Action
+        +trigger(event: Event) None
+    }
+
+    class Action {
+        +description: String
+        +execute(event: Event) None
+    }
+
+    class State {
+        +name: String
+        -enter: Action
+        -exit: Action
+        +enter(event: Event) None
+        +exit(event: Event) None
+    }
+
+    class Transition {
+        +from: State
+        +event: Event
+        +guard: Guard
+        +trigger: Trigger
+        +to: State
+        +matches(currentState: State, event: Event) bool
+    }
+
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine ..> Event : fire
+    Transition "1" --> "1" State : from
+    Transition "1" --> "1" State : to
+    Transition "1" --> "1" Event : event
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Trigger : trigger
+    State "1" --> "0..1" Action : enter
+    State "1" --> "0..1" Action : exit
+    Trigger "1" --> "0..1" Action : action
+    Guard ..> Event : evaluates
+    Action ..> Event : uses
+
+    note for FiniteStateMachine "Successful transition order: from.exit, trigger.trigger, set currentState to to, to.enter"

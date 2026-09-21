@@ -1,0 +1,82 @@
+classDiagram
+    direction LR
+
+    %% ======================= 核心 FSM 模組（既有，完全不修改） =======================
+    class FiniteStateMachine {
+        -currentState: State
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +fire(event: Event) bool
+    }
+
+    class Event {
+        +name: String
+    }
+
+    class Trigger {
+        +isTriggeredBy(event: Event) bool
+    }
+
+    class Guard {
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        +execute(event: Event) None
+    }
+
+    class State {
+        <<interface>>
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+    }
+
+    class Transition {
+        +from: State
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: State
+        +isApplicable(currentState: State, event: Event) bool
+    }
+
+    FiniteStateMachine "1" --> "1" State : currentState
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    Transition "1" --> "1" State : from
+    Transition "1" --> "1" State : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    %% ======================= 子狀態機插件（新增，獨立套件） =======================
+    class NestedFireable {
+        <<interface>>
+        +fire(event: Event) bool
+    }
+
+    class SubStateMachineState {
+        -innerFsm: FiniteStateMachine
+        -enter: Action
+        -exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class NestedFiniteStateMachineDriver {
+        +fireDeep(fsm: FiniteStateMachine, event: Event) bool
+    }
+
+    State <|.. SubStateMachineState : 實作（外層眼中只是普通 State）
+    NestedFireable <|.. SubStateMachineState : 額外實作（供路由判斷用）
+    SubStateMachineState "1" --> "1" FiniteStateMachine : innerFsm（組合，可再套一層 SubStateMachineState 達成任意深度）
+    NestedFiniteStateMachineDriver ..> FiniteStateMachine : 呼叫 currentState / fire
+    NestedFiniteStateMachineDriver ..> NestedFireable : 判斷 currentState 是否可鑽入
+
+    note for SubStateMachineState "onEnter(event): 1) 執行自身 enter action 2) 呼叫 innerFsm 初始 State 的 onEnter\nonExit(event): 1) 呼叫 innerFsm 當前 State 的 onExit 2) 執行自身 exit action\nfire(event): 委派給 innerFsm.fire(event)，回傳是否有 Transition 被觸發"
+
+    note for NestedFiniteStateMachineDriver "fireDeep(fsm, event):\n  current = fsm.currentState\n  if current instanceof NestedFireable:\n      if fireDeep(current.innerFsm, event): return true   // 遞迴，天然支援任意深度\n  return fsm.fire(event)   // 子層沒處理，才輪到本層 Transition\nClient 一律呼叫 fireDeep(topFsm, event) 取代直接呼叫 topFsm.fire(event)"
+
+    note for FiniteStateMachine "本類別完全未被修改：不知道也不需要知道 SubStateMachineState 的存在，滿足 OCP"

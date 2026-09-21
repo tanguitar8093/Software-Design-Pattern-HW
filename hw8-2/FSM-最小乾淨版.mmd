@@ -4,7 +4,7 @@ classDiagram
     class FiniteStateMachine {
         +currentState: State
         +transitions: List~Transition~
-        +dispatch(event: Event, context: Context)
+        +dispatch(event: Event)
         +addTransition(transition: Transition)
         +enterInitialState()
     }
@@ -26,12 +26,21 @@ classDiagram
 
     class Guard {
         <<interface>>
-        +check(context: Context): boolean
+        +check() : boolean
     }
 
     class Action {
         <<interface>>
-        +execute(context: Context): void
+        +execute()
+    }
+
+    class Trigger {
+        +fromState: State
+        +event: Event
+        +guard: Guard
+        +transition: Transition
+        +match(event: Event, state: State) : boolean
+        +fire()
     }
 
     class Transition {
@@ -40,26 +49,23 @@ classDiagram
         +event: Event
         +guard: Guard
         +action: Action
-        +canTrigger(event: Event, context: Context): boolean
-        +execute(context: Context)
-    }
-
-    class Context {
-        +sourceId: String
-        +content: String
-        +quota: int
-        +onlineCount: int
-        +isBroadcasting: bool
-        +currentTime: DateTime
+        +canTrigger(event: Event) : boolean
+        +execute()
     }
 
     FiniteStateMachine --> State
     FiniteStateMachine --> Transition
+    FiniteStateMachine --> Trigger
     FiniteStateMachine ..> Event
+
+    Trigger --> Event
+    Trigger --> State
+    Trigger --> Guard
+    Trigger --> Transition
+
     Transition --> State
     Transition --> Event
     Transition --> Guard
     Transition --> Action
+
     State --> Action
-    Guard ..> Context
-    Action ..> Context

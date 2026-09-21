@@ -1,0 +1,87 @@
+classDiagram
+    direction LR
+
+    class FiniteStateMachine {
+        +initialState: State
+        +currentState: State
+        +transitions: List~Transition~
+        +start() void
+        +handle(event: Event) void
+    }
+    note for FiniteStateMachine "職責：依目前狀態與轉移規則處理事件。"
+
+    class State {
+        +name: String
+        +entryAction: Action
+        +exitAction: Action
+        +enter() void
+        +exit() void
+    }
+    note for State "職責：表示 FSM 所處情況並定義進場與出場行為。"
+
+    class Transition {
+        +from: State
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: State
+        +canTransit(event: Event, currentState: State) bool
+        +transit() void
+    }
+    note for Transition "職責：定義事件與條件成立時從來源狀態移往目標狀態的規則。"
+
+    class Event {
+        +name: String
+        +payload: Object
+        +getName() String
+        +getPayload() Object
+    }
+    note for Event "職責：描述觸發 FSM 回應的外部事件。"
+
+    class Trigger {
+        <<interface>>
+        +event: Event
+        +matches(event: Event) bool
+    }
+    note for Trigger "職責：判斷發生的事件是否會觸發指定轉移。"
+
+    class Guard {
+        <<interface>>
+        +description: String
+        +evaluate() bool
+    }
+    note for Guard "職責：判斷轉移必須滿足的條件。"
+
+    class Action {
+        <<interface>>
+        +description: String
+        +execute() void
+    }
+    note for Action "職責：封裝狀態進出或轉移時要執行的行為。"
+
+    class SubStateMachinePlugin {
+        <<plugin>>
+        +subStateMachines: Map~State,FiniteStateMachine~
+        +attach(state: State, fsm: FiniteStateMachine) void
+        +handle(event: Event) void
+    }
+    note for SubStateMachinePlugin "職責：在不修改 FSM 核心下，為狀態掛接可任意巢狀的子狀態機。"
+
+    FiniteStateMachine "1" --> "1" State : 初始狀態
+    FiniteStateMachine "1" --> "1" State : 目前狀態
+    FiniteStateMachine "1" o-- "0..*" Transition : 轉移規則
+
+    Transition "0..*" --> "1" State : from
+    Transition "0..*" --> "1" State : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    Trigger "1" --> "1" Event : event
+
+    State "1" --> "0..1" Action : entry action
+    State "1" --> "0..1" Action : exit action
+
+    SubStateMachinePlugin "1" --> "1" FiniteStateMachine : 擴充
+    SubStateMachinePlugin "1" o-- "0..*" FiniteStateMachine : 子狀態機
+    SubStateMachinePlugin "1" --> "1..*" State : 掛接位置
