@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant Client
+    participant outer as 外層 FiniteStateMachine（Record 節點本身）
+    participant waiting as Waiting : State
+    participant t as Transition(Waiting→Recording)
+    participant recording as Recording : State
+
+    Note over Client,recording: Sample 2（巢狀）：Record 狀態收到 go broadcasting 事件<br/>outer 這台 FiniteStateMachine 本身就是被外外層當成 currentState 塞進去的 StateNode
+
+    Client ->> outer: fire(event="go broadcasting")
+
+    outer ->> waiting: fire(event)
+    waiting -->> outer: false（單純狀態，永遠交給外層處理）
+
+    outer ->> t: isApplicable(currentState=waiting, event)
+    t -->> outer: true（沒有 Guard，符合條件即成立）
+
+    outer ->> waiting: onExit(event)
+    Note right of outer: 更新 currentState = Recording
+    outer ->> recording: onEnter(event)
+
+    outer -->> Client: true（在這一層就處理完了，不會再往上比對更外層的 Transition[]）
+
+    Note over Client,recording: 對照：若外層還有一台 FiniteStateMachine 把「outer」當成自己的 currentState，<br/>它只會呼叫一次 outer.fire(event)，完全不需要知道 outer 內部剛剛發生了什麼巢狀轉移

@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant Client
+    participant fsm as FiniteStateMachine
+    participant king as King : State
+    participant t as Transition(King→Normal)
+    participant guard as Guard
+    participant exitAction as King.exit : Action
+    participant normal as Normal : State
+    participant enterAction as Normal.enter : Action
+
+    Note over Client,enterAction: Sample 1（不巢狀）：King 狀態收到 king-stop 事件
+
+    Client ->> fsm: fire(event)
+    fsm ->> king: fire(event)
+    king -->> fsm: false（單純狀態，永遠交給外層處理）
+
+    fsm ->> t: isApplicable(currentState=king, event)
+    t ->> guard: isSatisfied(event)
+    guard -->> t: true
+    t -->> fsm: true（找到可執行的轉移）
+
+    fsm ->> king: onExit(event)
+    king ->> exitAction: execute(event)
+
+    Note right of fsm: 更新 currentState = Normal
+
+    fsm ->> normal: onEnter(event)
+    normal ->> enterAction: execute(event)
+
+    fsm -->> Client: true（轉移成功）
