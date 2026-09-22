@@ -1,0 +1,91 @@
+從 MVP 角度看，應該優先做 Bot 模組（往下走到能跑出正確 input/output 的最小可行流程），而不是先把「子狀態機插件化」這個結構品質問題做到完美。
+
+為什麼
+MVP 的核心精神是「先求端到端能動、產出正確結果，再迭代品質」。回頭看你手上的兩件事：
+
+子狀態機插件化（讓 FiniteStateMachine 不必天生實作 StateNode）：這是結構品質問題，不影響任何一個範例輸入能不能跑出正確輸出。就算現在 FiniteStateMachine 直接 implements StateNode（不是嚴格插件），你一樣可以用它組出 Normal/Record/KnowledgeKing 三層巢狀狀態機，功能完全不受影響。
+Bot 模組 + Application 層：這才是「有沒有正確結果」的關�Goodkey——沒有這層，你連範例輸入都跑不出範例輸出，談不上任何驗收。
+所以插件化本質上是「事後可以局部重構」的結構調整：只要 StateNode/FiniteStateMachine 對外的介面形狀不變，之後要不要把子狀態機能力抽成獨立插件，是 FSM 模組內部的事，不會動到已經寫好的 Bot 模組或 Application 層程式碼。反過來說，如果你先花時間打磨插件化，Bot 模組還沒有著落，你完全不知道目前 FSM 的介面設計「夠不夠用」——很可能等你動手做 Bot 模組時，才發現介面還缺東西（例如我們前幾輪聊到的「動態初始子狀態」、Event 子類別設計），那時候插件化的工也等於要重做。
+
+建議的實際順序
+先把 Bot 模組需要、但 FSM 目前還缺的最小必要能力補齊（不追求插件化，先求能動）：
+Event 改成具名子類別設計（上幾輪已經定案）。
+補上「進入複合狀態時，依條件動態決定初始子狀態」的機制（Normal 依線上人數、Record 依是否已有人廣播）。
+Quota 這種跨狀態共用資源，先想好要注入到哪個 Guard/Action。
+直接動手寫 Bot 模組 + Application 層，用目前這版（未插件化）的 FSM 組出三大狀態、子狀態、指令、輪播回覆等邏輯，讓範例輸入能跑出範例輸出。
+功能正確之後，如果還有餘裕，再回頭把「子狀態機支援」從 FiniteStateMachine 裡抽出來變成真正的插件，這是最後的架構品質加分項，不影響你先把整個流程走通。
+簡單一句話：先求「能動、對答案」，子狀態機插件化留到最後打磨。
+
+
+1. Event 改具名子類別（快速複習）
+
+這個前幾輪講過了，這裡不重複。
+
+2. 「進入複合狀態時，依條件動態決定初始子狀態」是什麼意思
+問題出在哪
+回顧 README：
+
+Normal 狀態底下有兩個子狀態 DefaultConversation、Interacting。進入 Normal 的當下，要看「線上人數 < 10 → DefaultConversation，否則 → Interacting」。
+Record 狀態底下有 Waiting、Recording。進入 Record 的當下，要看「已經有人在廣播 → Recording，否則 → Waiting」。
+但目前 fsm-依賴反轉版.mmd 的類別圖上，FiniteStateMachine 只有一個 currentState: StateNode 欄位，意味著「一旦這台 FSM 被建立，它的初始狀態就是固定寫死的那一個」。這沒辦法表達「每次進入這個複合狀態時，都要重新評估一次條件，才知道要進去哪個子狀態」。
+
+具體要補的東西
+你需要一個「進場時才會被呼叫、用來決定初始子狀態」的機制，而不是建構時就寫死。可以設計成一個介面：
+
+
+然後讓 FiniteStateMachine（子狀態機版本）改成持有 initial_selector 而不是固定的 initial: StateNode：
+
+
+具體到 Normal 狀態，你會這樣組裝：
+
+
+這樣每次「重新進入 Normal」時（不管是從 Record 回來、還是從 KnowledgeKing 回來），都會重新問一次現在的線上人數，決定回去 DefaultConversation 還是 Interacting——而不是永遠回到同一個寫死的初始狀態。Record 底下的 Waiting/Recording 選擇邏輯同理，只是判斷條件換成「目前是否有人正在廣播」。
+
+3. Quota 要「注入到哪個 Guard」是什麼意思
+問題出在哪
+king（額度 5）、record（額度 3）、play again（額度 5）這幾個指令共用同一包「全社群額度」，扣一次全部人共用的量會變少。這代表額度不是屬於某個 State 私有的東西，而是一個橫跨整個機器人生命週期、被多個不同 Transition 的 Guard 共享讀寫的資源。
+
+具體要補的東西
+先設計一個「額度池」物件，整個程式生命週期只會有一個實例：
+
+
+然後每個「指令」對應的 Guard，建構時就把同一個 QuotaPool 實例注入進去（不是每個 Guard 各自 new 一個，一定要共用同一份）：
+
+
+實際組裝 Transition 的時候：
+
+
+重點是：king_transition 和 record_transition 的 HasQuotaGuard 拿到的是同一個 quota_pool 物件（不是各自獨立算各自的），這樣不管誰先觸發、誰後觸發，額度都是從同一個池子裡扣，才符合「全社群共用」的規則。
+
+小結
+這三點合起來要解決的，其實都是「目前 fsm-依賴反轉版.mmd 的類別圖，只表達了『靜態』的狀態機（固定初始狀態、Transition 各自獨立不共享資料），但 Waterball 機器人需要『動態』的初始子狀態判斷、和『跨 Transition 共享』的額度資源」——這兩個能力補齊之後，你才有足夠的積木去組出 Bot 模組。
+
+
+用具體的程式碼跑一次「錯在哪」會比較清楚。
+
+先看「固定初始狀態」的天真寫法會怎麼壞掉
+假設 FiniteStateMachine 就長這樣（最單純、你會直覺寫出來的版本）：
+
+
+然後你在程式一開始，組裝 Normal 這個複合狀態時，只能寫死選一個當 initial：
+
+
+具體照著 README 的情境走一次，看哪裡壞掉
+跟著 README 的範例輸入走：
+
+一開始只有 1 個人登入，線上人數 < 10 → 進入 Normal 時應該是 DefaultConversation。這時候你把 initial=default_conversation 這樣寫死，看起來「暫時」是對的。
+接著陸續登入到第 10 人，機器人偵測到線上人數 ≥ 10，觸發 Transition 切去 Interacting（這是同一台 Normal FSM 內部子狀態之間的轉移，沒問題，因為這是靠 Transition 機制處理的，不是靠「初始狀態」）。
+後來有人下 king 指令，整台機器人從 Normal 整個跳到 KnowledgeKing 狀態（注意：這是外層大狀態機的轉移，Normal 這個複合狀態會被 onExit，整個「離開」）。
+知識王玩完，king-stop 或時間到，機器人要重新進入 Normal——這時候會呼叫 normal_fsm.on_enter(event)。
+問題就在第 4 步：
+
+
+不管現在線上人數是 3 人還是 15 人，只要你在建構時把 initial 寫死成 default_conversation，每次重新進入 Normal，都只會回到 DefaultConversation，因為 on_enter 裡面根本沒有「去看現在線上人數是多少」這個判斷——它只是機械式地把 self.initial 這個寫死的欄位塞回 current_state。
+
+但 README 的規則是：「如果線上人數 < 10，則初始狀態為預設對話狀態，否則初始狀態為互動狀態」——這句話要求的是每次進入 Normal 的當下都要重新檢查一次線上人數，而不是「永遠回到建構時選定的那個狀態」。如果線上人數這時候已經是 15 人，正確答案應該進 Interacting，但天真寫法會錯誤地把你丟回 DefaultConversation。
+
+換句話說，問題出在「決定初始狀態」的時間點不對
+天真寫法：「要進哪個子狀態」這個決定，在建構 FSM 的當下（也就是程式一開始組裝物件的時候）就已經拍板定案，之後每次 on_enter 都只是照抄同一個答案。
+正確需求：「要進哪個子狀態」這個決定，必須延後到每一次真正呼叫 on_enter 的當下才去問「現在的條件是什麼」，才給出答案（可能這次是 DefaultConversation，下次進來又變成 Interacting，答案會隨時間改變）。
+這也是為什麼上一則回覆建議把 initial: StateNode（一個固定值）換成 initial_selector: InitialStateSelector（一個「每次被呼叫才會去現場問一次條件」的物件）——把「決定答案」這件事從「建構時」推遲到「真正進場的那一刻」，才能讓答案隨著線上人數變化而變化。
+

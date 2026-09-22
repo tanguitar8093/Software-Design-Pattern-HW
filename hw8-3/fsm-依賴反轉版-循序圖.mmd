@@ -1,0 +1,57 @@
+sequenceDiagram
+    participant Client
+    participant FSM as FiniteStateMachine
+    participant T as Transition
+    participant Trig as Trigger
+    participant G as Guard
+    participant Cur as currentState : StateNode
+    participant Act as Action
+    participant Next as to : StateNode
+
+    Client ->> FSM: fire(event)
+    activate FSM
+
+    loop 依序檢查 transitions
+        FSM ->> T: isApplicable(currentState, event)
+        activate T
+        T ->> T: currentState == from ?
+        T ->> Trig: isTriggeredBy(event)
+        activate Trig
+        Trig -->> T: bool
+        deactivate Trig
+        T ->> G: isSatisfied(event)
+        activate G
+        G -->> T: bool
+        deactivate G
+        T -->> FSM: applicable = true/false
+        deactivate T
+    end
+
+    alt 找到 applicable transition
+        FSM ->> Cur: onExit(event)
+        activate Cur
+        Note over Cur: 若 currentState 本身是 FiniteStateMachine（實作 StateNode），\n此呼叫會遞迴呼叫其子狀態的 onExit，形成任意深度巢狀
+        Cur -->> FSM:
+        deactivate Cur
+
+        opt transition 有 action
+            FSM ->> Act: execute(event)
+            activate Act
+            Act -->> FSM:
+            deactivate Act
+        end
+
+        FSM ->> FSM: currentState = transition.to
+
+        FSM ->> Next: onEnter(event)
+        activate Next
+        Note over Next: 若 to 本身是 FiniteStateMachine，\n此呼叫會遞迴呼叫其子狀態的 onEnter
+        Next -->> FSM:
+        deactivate Next
+
+        FSM -->> Client: true
+    else 無 applicable transition
+        FSM -->> Client: false
+    end
+
+    deactivate FSM
