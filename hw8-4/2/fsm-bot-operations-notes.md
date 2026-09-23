@@ -43,3 +43,17 @@
 - **觸發時機**：`onExit(event)` 被呼叫的當下，用來取得該執行哪個 `Action`。
 - **被誰觸發**：由自己的 `onExit(event)` 方法內部呼叫，取得 `Action` 後立刻執行 `execute(event)`；也可能是外層 `FiniteStateMachine.fire()` 在換狀態前呼叫 `currentState.onExit(event)` 時間接觸發。
 - **會觸發誰**：不主動呼叫別人，純粹回傳持有的 `Action` 物件參照。
+
+## OP7 — `State.fire(event: Event): bool`
+
+- **主要行為**：固定回傳 `false`。單純狀態沒有子狀態可委派、也沒有自己的 `Transition[]` 可比對，永遠回報「我這層沒有轉移發生」。
+- **觸發時機**：外層 `FiniteStateMachine.fire(event)` 把自己（leaf state）當作 `currentState` 委派下來時。
+- **被誰觸發**：由外層 `FiniteStateMachine.fire(event)` 委派呼叫。
+- **會觸發誰**：不呼叫任何其他物件，直接回傳 `false`。
+
+## OP8 — `State.internalFire(event: Event): None`
+
+- **主要行為**：掃描自己持有的 `internalTransitions[*]`，找到第一個 `trigger` 命中且 `guard` 通過的，執行其 `action`；找不到就什麼都不做。不觸發 `onExit`/`onEnter`，不換狀態。
+- **觸發時機**：外層（可能是更上層的 `FiniteStateMachine`）委派下來時，代表這裡就是真正的 leaf state。
+- **被誰觸發**：由外層 `FiniteStateMachine.internalFire(event)` 一路委派下來呼叫。
+- **會觸發誰**：呼叫 `internalTransitions[*]` 裡符合條件那一個的 `action.execute(event)`；不會呼叫別的狀態或觸發任何轉移。

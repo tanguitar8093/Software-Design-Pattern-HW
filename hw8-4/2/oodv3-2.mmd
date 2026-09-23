@@ -179,6 +179,11 @@ classDiagram
     class State {
         +enter: Action
         +exit: Action
+        +internalTransitions: InternalTransition[*]
+        +onEnter(event: Event) void
+        +onExit(event: Event) void
+        +fire(event: Event) bool
+        +internalFire(event: Event) void
     }
 
     class FiniteStateMachine {
