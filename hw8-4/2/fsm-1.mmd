@@ -28,9 +28,19 @@ sequenceDiagram
     end
 
     rect rgb(255, 250, 240)
-    Note over Client, Next: 轉移流程（跟舊版相同的比對邏輯）
+    Note over Client, Next: 轉移流程（新增：先往內委派給 currentState，處理不了才輪到自己這層）
     Client ->> FSM: fire(event)
     activate FSM
+
+    FSM ->> Cur: fire(event)
+    activate Cur
+    Note over Cur: 多型呼叫：若 Cur 是 State，固定回傳 false；\n若 Cur 本身是 FiniteStateMachine，會真的去比對它自己的 Transition[]，\n甚至繼續往更深層委派（event bubbling，innermost-first）
+    Cur -->> FSM: handled : bool
+    deactivate Cur
+
+    alt handled == true
+        FSM -->> Client: true
+    else handled == false
 
     loop 依序檢查 transitions
         FSM ->> T: isApplicable(currentState, event)
@@ -70,6 +80,8 @@ sequenceDiagram
         FSM -->> Client: true
     else 無 applicable transition
         FSM -->> Client: false
+    end
+
     end
 
     deactivate FSM

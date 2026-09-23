@@ -87,8 +87,8 @@ classDiagram
     State "1" --> "0..1" Action : exit action
 
     note for StateNode "Component：State 與 FiniteStateMachine 的共同行為契約，兩者互為平輩，不再是誰包誰的欄位關係"
-    note for State "State.fire(event) 固定回傳 false：單純狀態沒有自己的 Transition[] 可比對，轉移邏輯屬於外層 FiniteStateMachine"
-    note for FiniteStateMachine "onEnter(event): 呼叫 initialStateSelector.select(event) 重新評估後才決定 currentState，再呼叫 currentState.onEnter(event)（每次進場都重新判斷，而非沿用建構時寫死的初始狀態）\nonExit(event): 呼叫 currentState.onExit(event)\nfire(event): 比對自己的 Transition[]，回傳是否有轉移被觸發\n因為自己也實作 StateNode，可被放進另一台 FiniteStateMachine 的 currentState/Transition.from/to，形成任意深度巢狀"
+    note for State "State.fire(event) 固定回傳 false：單純狀態沒有子狀態可委派、也沒有自己的 Transition[] 可比對，轉移邏輯屬於外層 FiniteStateMachine"
+    note for FiniteStateMachine "onEnter(event): 呼叫 initialStateSelector.select(event) 重新評估後才決定 currentState，再呼叫 currentState.onEnter(event)（每次進場都重新判斷，而非沿用建構時寫死的初始狀態）\nonExit(event): 呼叫 currentState.onExit(event)\nfire(event): 先委派給 currentState.fire(event)（多型呼叫，event bubbling / innermost-first）；若回傳 true 代表內層已處理完轉移，直接回傳 true；若回傳 false，才比對自己的 Transition[]，回傳是否有轉移被觸發\n因為自己也實作 StateNode，可被放進另一台 FiniteStateMachine 的 currentState/Transition.from/to，形成任意深度巢狀"
     note for InitialStateSelector "把「決定初始子狀態」的時機從 FSM 建構當下，延後到每次 onEnter 被呼叫的當下才評估，讓 Normal（依線上人數）、Record（依是否已有人廣播）這類動態初始子狀態需求可以被表達"
     note for Event "純粹的抽象標記類別，不帶欄位；具體事件（如 LoginEvent、NewMessageEvent）各自延伸出自己的資料欄位，FSM 核心只認得這個抽象型別"
     note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."
