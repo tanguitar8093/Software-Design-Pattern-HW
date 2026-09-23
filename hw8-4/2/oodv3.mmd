@@ -1,0 +1,282 @@
+classDiagram
+    direction LR
+
+    %% ======================= 社群基礎設施 (Waterball Community) =======================
+    class WaterCommunity {
+        -currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: str) void
+        +elapseTime(amount: int, unit: str) void
+        +getOnlineParticipants() list~Participant~
+        +getOnlineCount() int
+    }
+
+    class Participant {
+        <<abstract>>
+        -id: str
+    }
+
+    class Member {
+        -role: int
+        +sendMessage(chatRoom: ChatRoom, content: str, tags: list~str~) void
+        +publishPost(forum: Forum, title: str, content: str, tags: list~str~) void
+        +commentPost(forum: Forum, postId: str, content: str, tags: list~str~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: str) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN = "ADMIN"
+        MEMBER = "MEMBER"
+    }
+
+    Participant <|-- Member
+    Member --> Role : role
+    WaterCommunity "1" o-- "0..*" Participant : 線上參與者
+    WaterCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterCommunity "1" *-- "1" Forum : 擁有
+    WaterCommunity "1" *-- "1" Broadcast : 擁有
+
+    %% ======================= 聊天室 / 論壇 / 廣播 =======================
+    class ChatRoom {
+        +postMessage(message: Message) void
+    }
+
+    class Message {
+        -authorId: str
+        -content: str
+        -tags: list~str~
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: str, comment: Comment) void
+        +getPost(id: str) Post
+    }
+
+    class Post {
+        -id: str
+        -authorId: str
+        -title: str
+        -content: str
+        -tags: list~str~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        -authorId: str
+        -content: str
+        -tags: list~str~
+    }
+
+    class Broadcast {
+        -currentSpeakerId: str
+        +start(speakerId: str) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: str) void
+        +isBroadcasting() bool
+    }
+
+    class VoiceMessage {
+        -speakerId: str
+        -content: str
+    }
+
+    ChatRoom "1" o-- "0..*" Message
+    Forum "1" o-- "0..*" Post
+    Post "1" o-- "0..*" Comment
+    Broadcast "1" o-- "0..*" VoiceMessage
+
+    Member ..> ChatRoom : 交流 下指令
+    Member ..> Forum : 論壇發布/留言
+    Member ..> Broadcast : 語音廣播操作
+
+    %% ======================= Domain Event / Event Publisher =======================
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+
+    class MessagePostedEvent {
+        -message: Message
+        +getSourceId() str|None
+    }
+    class PostCreatedEvent {
+        -post: Post
+        +getSourceId() str|None
+    }
+    class CommentAddedEvent {
+        -comment: Comment
+        +getSourceId() str|None
+    }
+    class BroadcastStartedEvent {
+        -speakerId: str
+        +getSourceId() str|None
+    }
+    class BroadcastStoppedEvent {
+        -speakerId: str
+        +getSourceId() str|None
+    }
+    class VoiceSpokenEvent {
+        -voiceMessage: VoiceMessage
+        +getSourceId() str|None
+    }
+    class LoginEvent {
+        -userId: str
+        -isAdmin: bool
+        +getSourceId() str|None
+    }
+    class LogoutEvent {
+        -userId: str
+        +getSourceId() str|None
+    }
+    class TimeElapsedEvent {
+        -amount: int
+        -unit: str
+        +getSourceId() str|None
+    }
+
+    DomainEvent <|.. MessagePostedEvent
+    DomainEvent <|.. PostCreatedEvent
+    DomainEvent <|.. CommentAddedEvent
+    DomainEvent <|.. BroadcastStartedEvent
+    DomainEvent <|.. BroadcastStoppedEvent
+    DomainEvent <|.. VoiceSpokenEvent
+    DomainEvent <|.. LoginEvent
+    DomainEvent <|.. LogoutEvent
+    DomainEvent <|.. TimeElapsedEvent
+
+    class CommunityObserver {
+        <<interface>>
+        +getId() str
+        +onEvent(event: DomainEvent) void
+    }
+
+    class EventPublisher {
+        -observers: list~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+
+    EventPublisher "1" o-- "0..*" CommunityObserver : observers
+    ChatRoom ..> EventPublisher : notify(MessagePostedEvent)
+    Forum ..> EventPublisher : notify(PostCreatedEvent/CommentAddedEvent)
+    Broadcast ..> EventPublisher : notify(BroadcastStarted/Stopped/VoiceSpokenEvent)
+    WaterCommunity ..> EventPublisher : notify(LoginEvent/LogoutEvent/TimeElapsedEvent)
+
+    %% ======================= FSM 模組（外部依賴，完整定義見 fsm-ooa.mmd） =======================
+    class StateNode {
+        <<interface>>
+        +onEnter(event: Event) void
+        +onExit(event: Event) void
+        +fire(event: Event) bool
+    }
+
+    class State {
+        +enter: Action
+        +exit: Action
+    }
+
+    class FiniteStateMachine {
+        -currentState: StateNode
+        -initialStateSelector: InitialStateSelector
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) void
+    }
+
+    StateNode <|.. State
+    StateNode <|.. FiniteStateMachine
+
+    note for FiniteStateMachine "來自 FSM 模組，完整定義（Transition/Trigger/Guard/Action/InitialStateSelector）見 fsm-ooa.mmd、fsm-1.mmd。\nking/record/stop-recording/play again/king-stop 等指令觸發的狀態轉移，\n現在都是掛在對應 FiniteStateMachine 上的 Transition（Trigger + Guard + Action）物件負責，\n不再由 Bot 或狀態類別自己判斷條件、自己呼叫轉移。"
+
+    %% ======================= Bot 主體 =======================
+    class Bot {
+        -id: str = "bot"
+        -quota: int
+        -description: str
+        -rootFsm: FiniteStateMachine
+        +onEvent(event: DomainEvent) void
+        +replyChatMessage(content: str, tags: list~str~) void
+        +commentPost(postId: str, content: str, tags: list~str~) void
+        +broadcastVoice(content: str) void
+    }
+
+    CommunityObserver <|.. Bot
+    Bot "1" --> "1" FiniteStateMachine : rootFsm
+    Bot ..> ChatRoom : replyChatMessage()
+    Bot ..> Forum : commentPost()
+    Bot ..> Broadcast : broadcastVoice()
+    Bot --> EventPublisher : register(this)
+
+    %% ======================= 具體狀態（改為擴充 FSM 模組的 State） =======================
+    class DefaultConversationState {
+        -replyCycleIndex: int
+        +getNextReplyMessage() str
+    }
+    class InteractingState {
+        -replyCycleIndex: int
+        +getNextReplyMessage() str
+    }
+    class WaitingState
+    class RecordingState {
+        -session: RecordingSession
+    }
+    class QuestioningState {
+        -game: KnowledgeKingGame
+    }
+    class ThanksForJoiningState {
+        -game: KnowledgeKingGame
+    }
+
+    State <|-- DefaultConversationState
+    State <|-- InteractingState
+    State <|-- WaitingState
+    State <|-- RecordingState
+    State <|-- QuestioningState
+    State <|-- ThanksForJoiningState
+
+    RecordingState "1" --> "0..1" RecordingSession : 進行錄音會話
+    QuestioningState "1" --> "1" KnowledgeKingGame : 主持知識王遊戲
+    ThanksForJoiningState "1" --> "1" KnowledgeKingGame : 主持知識王遊戲
+
+    %% ======================= 錄音 / 知識王 子領域 =======================
+    class RecordingSession {
+        -recorderId: str
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() str
+    }
+    RecordingSession ..> VoiceMessage : 使用
+
+    class KnowledgeKingGame {
+        -currentQuestionIndex: int
+        -startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: str, answer: str) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() str
+    }
+    class Question {
+        -number: int
+        -description: str
+        -options: list~str~
+        -correctAnswer: str
+        +isCorrect(answer: str) bool
+    }
+    KnowledgeKingGame "1" o-- "3" Question : 包含題目
+
+    note for Participant "詳見便條紙 N1（oodv2-notes.md）"
+    note for Member "詳見便條紙 N2（oodv2-notes.md）"
+    note for WaterCommunity "詳見便條紙 N3（oodv2-notes.md）"
+    note for EventPublisher "詳見便條紙 N4（oodv2-notes.md）"
+    note for ChatRoom "詳見便條紙 N5（oodv2-notes.md）"
+    note for Forum "詳見便條紙 N6（oodv2-notes.md）"
+    note for DomainEvent "詳見便條紙 N7（oodv2-notes.md）"
+    note for CommunityObserver "詳見便條紙 N8（oodv2-notes.md）"
+    note for Bot "詳見便條紙 N9（oodv2-notes.md），但 currentState/transitionTo() 已改為 rootFsm，內容需對照本檔差異"
+    note for KnowledgeKingGame "詳見便條紙 N11（oodv2-notes.md）"
+    note for RecordingSession "詳見便條紙 N12（oodv2-notes.md）"
+    note for Question "詳見便條紙 N13（oodv2-notes.md）"
