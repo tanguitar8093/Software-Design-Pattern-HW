@@ -1,0 +1,76 @@
+sequenceDiagram
+    participant Client
+    participant FSM as FiniteStateMachine
+    participant Sel as initialStateSelector : InitialStateSelector
+    participant Cur as currentState : StateNode
+    participant T as Transition
+    participant Trig as Trigger
+    participant G as Guard
+    participant Act as Action
+    participant Next as to : StateNode
+
+    rect rgb(240, 248, 255)
+    Note over Client, Next: 進場流程（新增：透過 InitialStateSelector 動態決定初始子狀態）
+    Client ->> FSM: onEnter(event)
+    activate FSM
+    FSM ->> Sel: select(event)
+    activate Sel
+    Note over Sel: 根據 event 當下的條件（例如線上人數、是否已有人在廣播）\n即時評估，回傳這次應該進入的子狀態
+    Sel -->> FSM: chosenState : StateNode
+    deactivate Sel
+    FSM ->> FSM: currentState = chosenState
+    FSM ->> Cur: onEnter(event)
+    activate Cur
+    Note over Cur: 若 chosenState 本身也是 FiniteStateMachine，\n這裡會遞迴觸發它自己的「進場流程」，一路往下決定任意深度的子狀態
+    Cur -->> FSM:
+    deactivate Cur
+    deactivate FSM
+    end
+
+    rect rgb(255, 250, 240)
+    Note over Client, Next: 轉移流程（跟舊版相同的比對邏輯）
+    Client ->> FSM: fire(event)
+    activate FSM
+
+    loop 依序檢查 transitions
+        FSM ->> T: isApplicable(currentState, event)
+        activate T
+        T ->> T: currentState == from ?
+        T ->> Trig: isTriggeredBy(event)
+        activate Trig
+        Trig -->> T: bool
+        deactivate Trig
+        T ->> G: isSatisfied(event)
+        activate G
+        G -->> T: bool
+        deactivate G
+        T -->> FSM: applicable = true/false
+        deactivate T
+    end
+
+    alt 找到 applicable transition
+        FSM ->> Cur: onExit(event)
+        activate Cur
+        Cur -->> FSM:
+        deactivate Cur
+
+        opt transition 有 action
+            FSM ->> Act: execute(event)
+            activate Act
+            Act -->> FSM:
+            deactivate Act
+        end
+
+        FSM ->> Next: onEnter(event)
+        activate Next
+        Note over Next: 這裡就是最上面那段「進場流程」──\n代表每次透過 Transition 換到新狀態，一樣要重新問一次 InitialStateSelector，\n而不是沿用建構時寫死的初始狀態
+        Next -->> FSM:
+        deactivate Next
+
+        FSM -->> Client: true
+    else 無 applicable transition
+        FSM -->> Client: false
+    end
+
+    deactivate FSM
+    end
