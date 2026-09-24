@@ -86,35 +86,9 @@ classDiagram
     State "1" --> "0..1" Action : entry action
     State "1" --> "0..1" Action : exit action
 
-    %% ======================= 通用組合器（Composite over Strategy，Client 可自由擴充，不知道任何業務名詞） =======================
-    class AndGuard {
-        -guards: Guard[*]
-        +isSatisfied(event: Event) bool
-    }
-
-    class NotGuard {
-        -guard: Guard
-        +isSatisfied(event: Event) bool
-    }
-
-    class CompositeAction {
-        -actions: Action[*]
-        +execute(event: Event) None
-    }
-
-    Guard <|.. AndGuard
-    Guard <|.. NotGuard
-    Action <|.. CompositeAction
-    AndGuard "1" o-- "2..*" Guard : guards
-    NotGuard "1" --> "1" Guard : guard
-    CompositeAction "1" o-- "2..*" Action : actions
-
     note for StateNode "N1"
     note for State "N2"
     note for FiniteStateMachine "N3"
     note for InitialStateSelector "N4"
     note for Event "N5"
     note for Transition "N6"
-    note for AndGuard "N7"
-    note for NotGuard "N8"
-    note for CompositeAction "N9"
