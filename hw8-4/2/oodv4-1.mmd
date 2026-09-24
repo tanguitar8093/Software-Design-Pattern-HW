@@ -200,6 +200,20 @@ classDiagram
 
     note for FiniteStateMachine "詳見便條紙 N14（oodv4-1-notes.md）"
 
+    %% ======================= FSM 模組介面（完整定義與通用組合器見 fsm-ooa-2.mmd） =======================
+    class Guard {
+        <<interface>>
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        <<interface>>
+        +execute(event: Event) void
+    }
+
+    note for Guard "詳見便條紙 N14（oodv4-1-notes.md）"
+    note for Action "詳見便條紙 N14（oodv4-1-notes.md）"
+
     %% ======================= Bot 主體 =======================
     class Bot {
         -id: str = "bot"
@@ -287,3 +301,110 @@ classDiagram
     note for DomainEvent "詳見便條紙 N7（oodv2-notes.md）"
     note for CommunityObserver "詳見便條紙 N8（oodv2-notes.md）"
     note for KnowledgeKingGame "詳見便條紙 N11（oodv2-notes.md）"
+
+    %% ======================= Bot 專用具體 Guard（Step 2，8 個，implements Guard） =======================
+    class OnlineCountAtLeastGuard {
+        -threshold: int
+        +isSatisfied(event: Event) bool
+    }
+    class IsBroadcastingGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class AdminOnlyGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class QuotaAvailableGuard {
+        -cost: int
+        +isSatisfied(event: Event) bool
+    }
+    class CorrectAnswerGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class GameFinishedGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class IsRecorderGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class DurationElapsedGuard {
+        -duration: int
+        -unit: str
+        +isSatisfied(event: Event) bool
+    }
+
+    Guard <|.. OnlineCountAtLeastGuard
+    Guard <|.. IsBroadcastingGuard
+    Guard <|.. AdminOnlyGuard
+    Guard <|.. QuotaAvailableGuard
+    Guard <|.. CorrectAnswerGuard
+    Guard <|.. GameFinishedGuard
+    Guard <|.. IsRecorderGuard
+    Guard <|.. DurationElapsedGuard
+
+    OnlineCountAtLeastGuard ..> WaterCommunity : getOnlineCount()
+    IsBroadcastingGuard ..> Broadcast : isBroadcasting()
+    AdminOnlyGuard ..> Member : role
+    QuotaAvailableGuard ..> Bot : quota
+    CorrectAnswerGuard ..> KnowledgeKingGame : submitAnswer()
+    GameFinishedGuard ..> KnowledgeKingGame : isFinished()
+    IsRecorderGuard ..> RecordingSession : recorderId
+    DurationElapsedGuard ..> WaterCommunity : currentTime
+    DurationElapsedGuard ..> KnowledgeKingGame : startTime
+    DurationElapsedGuard ..> ThanksForJoiningState : 進場時間
+
+    note for OnlineCountAtLeastGuard "詳見便條紙 N16（oodv4-1-notes.md）"
+    note for IsBroadcastingGuard "詳見便條紙 N17（oodv4-1-notes.md）"
+    note for AdminOnlyGuard "詳見便條紙 N18（oodv4-1-notes.md）"
+    note for QuotaAvailableGuard "詳見便條紙 N19（oodv4-1-notes.md）"
+    note for CorrectAnswerGuard "詳見便條紙 N20（oodv4-1-notes.md）"
+    note for GameFinishedGuard "詳見便條紙 N21（oodv4-1-notes.md）"
+    note for IsRecorderGuard "詳見便條紙 N22（oodv4-1-notes.md）"
+    note for DurationElapsedGuard "詳見便條紙 N23（oodv4-1-notes.md）"
+
+    %% ======================= Bot 專用具體 Action（Step 2，6 個，implements Action） =======================
+    class CommentPostAction {
+        -text: str
+        -tagsProvider: Callable
+        +execute(event: Event) void
+    }
+    class FlushRecordReplayAction {
+        +execute(event: Event) void
+    }
+    class DeductQuotaAction {
+        -cost: int
+        +execute(event: Event) void
+    }
+    class CreateRecordingSessionAction {
+        +execute(event: Event) void
+    }
+    class CreateKnowledgeKingGameAction {
+        +execute(event: Event) void
+    }
+    class SendChatMessageAction {
+        -contentProvider: Callable
+        +execute(event: Event) void
+    }
+
+    Action <|.. CommentPostAction
+    Action <|.. FlushRecordReplayAction
+    Action <|.. DeductQuotaAction
+    Action <|.. CreateRecordingSessionAction
+    Action <|.. CreateKnowledgeKingGameAction
+    Action <|.. SendChatMessageAction
+
+    CommentPostAction ..> Forum : addComment()
+    FlushRecordReplayAction ..> RecordingSession : generateReplay()
+    FlushRecordReplayAction ..> Bot : replyChatMessage()
+    DeductQuotaAction ..> Bot : quota
+    CreateRecordingSessionAction ..> RecordingSession : 建立
+    CreateRecordingSessionAction ..> RecordingState : 附掛
+    CreateKnowledgeKingGameAction ..> KnowledgeKingGame : 建立
+    CreateKnowledgeKingGameAction ..> QuestioningState : 附掛
+    SendChatMessageAction ..> Bot : replyChatMessage()
+
+    note for CommentPostAction "詳見便條紙 N24（oodv4-1-notes.md）"
+    note for FlushRecordReplayAction "詳見便條紙 N25（oodv4-1-notes.md）"
+    note for DeductQuotaAction "詳見便條紙 N26（oodv4-1-notes.md）"
+    note for CreateRecordingSessionAction "詳見便條紙 N27（oodv4-1-notes.md）"
+    note for CreateKnowledgeKingGameAction "詳見便條紙 N28（oodv4-1-notes.md）"
+    note for SendChatMessageAction "詳見便條紙 N29（oodv4-1-notes.md）"

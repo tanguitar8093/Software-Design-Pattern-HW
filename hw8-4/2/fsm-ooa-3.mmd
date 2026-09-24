@@ -1,0 +1,120 @@
+classDiagram
+    direction LR
+
+    %% ======================= Component（依賴反轉後的共同介面） =======================
+    class StateNode {
+        <<interface>>
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class State {
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class FiniteStateMachine {
+        -currentState: StateNode
+        -initialStateSelector: InitialStateSelector
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) None
+        +onEnter(event: Event) None
+        +onExit(event: Event) None
+        +fire(event: Event) bool
+    }
+
+    class InitialStateSelector {
+        <<interface>>
+        +select(event: Event) StateNode
+    }
+
+    class Event {
+        <<abstract>>
+    }
+
+    class Trigger {
+        <<interface>>
+        +isTriggeredBy(event: Event) bool
+    }
+
+    class Guard {
+        <<interface>>
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        <<interface>>
+        +execute(event: Event) None
+    }
+
+    class Transition {
+        +from: StateNode
+        +trigger: Trigger
+        +guard: Guard
+        +action: Action
+        +to: StateNode
+        +isApplicable(currentState: StateNode, event: Event) bool
+    }
+
+    %% ======================= 依賴反轉：State 與 FiniteStateMachine 皆實作 StateNode =======================
+    StateNode <|.. State
+    StateNode <|.. FiniteStateMachine
+
+    %% ======================= 核心 FSM 關係 =======================
+    FiniteStateMachine "1" --> "0..1" StateNode : currentState
+    FiniteStateMachine "1" --> "1" InitialStateSelector : initialStateSelector
+    FiniteStateMachine "1" o-- "0..*" Transition : transitions
+    FiniteStateMachine ..> Event : receives
+    FiniteStateMachine ..> StateNode : calls onExit / onEnter
+    FiniteStateMachine ..> Action : executes transition action
+
+    InitialStateSelector ..> Event : evaluates
+    InitialStateSelector ..> StateNode : returns
+
+    Transition "1" --> "1" StateNode : from
+    Transition "1" --> "1" StateNode : to
+    Transition "1" --> "1" Trigger : trigger
+    Transition "1" --> "0..1" Guard : guard
+    Transition "1" --> "0..1" Action : action
+
+    Trigger ..> Event : identifies
+    Guard ..> Event : evaluates
+    State "1" --> "0..1" Action : entry action
+    State "1" --> "0..1" Action : exit action
+
+    %% ======================= 通用組合器（Composite over Strategy，Client 可自由擴充，不知道任何業務名詞） =======================
+    class AndGuard {
+        -guards: Guard[*]
+        +isSatisfied(event: Event) bool
+    }
+
+    class NotGuard {
+        -guard: Guard
+        +isSatisfied(event: Event) bool
+    }
+
+    class CompositeAction {
+        -actions: Action[*]
+        +execute(event: Event) None
+    }
+
+    Guard <|.. AndGuard
+    Guard <|.. NotGuard
+    Action <|.. CompositeAction
+    AndGuard "1" o-- "2..*" Guard : guards
+    NotGuard "1" --> "1" Guard : guard
+    CompositeAction "1" o-- "2..*" Action : actions
+
+    note for StateNode "Component：State 與 FiniteStateMachine 的共同行為契約，兩者互為平輩，不再是誰包誰的欄位關係。\n核心契約收斂回三個方法（onEnter/onExit/fire），移除 v2 版本曾經新增的 internalFire——那件事不屬於 FSM 核心職責，見下方 note for State 的說明。"
+    note for State "State.fire(event) 固定回傳 false：單純狀態沒有子狀態可委派、也沒有自己的 Transition[] 可比對，轉移邏輯屬於外層 FiniteStateMachine\n\n【v2→v3 變更】拿掉 internalTransitions/internalFire()。原因：『同一狀態內、不管會不會換狀態都要發生的原地反應』（如輪播回覆）根本不是狀態轉移問題，不需要 FSM 提供第二套 Trigger/Guard 比對機制才能解決。\nClient（Bot 模組）自己的具體 State 子類別，可以直接覆寫 onEnter(event)（FSM 本來就會呼叫的既有鉤子）來做兩件事：① 執行原本 entry action 的邏輯 ② 把 self 記錄成 Client 自己追蹤的『目前作用中的 leaf state』參照。之後 Client 直接對這個參照做多型呼叫（呼叫 Client 自己定義、FSM 完全不認識的方法，例如 onMessageReceived(event)），跟 FSM 的 fire() 兩條路完全獨立、互不干擾，也不會有短路或誤觸發 entry/exit 的問題。FSM core 介面因此不需要為了這個需求膨脹。"
+    note for FiniteStateMachine "onEnter(event): 呼叫 initialStateSelector.select(event) 重新評估後才決定 currentState，再呼叫 currentState.onEnter(event)（每次進場都重新判斷，而非沿用建構時寫死的初始狀態）\nonExit(event): 呼叫 currentState.onExit(event)\nfire(event): 先委派給 currentState.fire(event)（多型呼叫，event bubbling / innermost-first）；若回傳 true 代表內層已處理完轉移，直接回傳 true；若回傳 false，才比對自己的 Transition[]，回傳是否有轉移被觸發\n因為自己也實作 StateNode，可被放進另一台 FiniteStateMachine 的 currentState/Transition.from/to，形成任意深度巢狀\n\n【v2→v3 變更】拿掉 internalFire()，理由同 State 的 note。"
+    note for InitialStateSelector "把「決定初始子狀態」的時機從 FSM 建構當下，延後到每次 onEnter 被呼叫的當下才評估，讓 Normal（依線上人數）、Record（依是否已有人廣播）這類動態初始子狀態需求可以被表達"
+    note for Event "純粹的抽象標記類別，不帶欄位；具體事件（如 LoginEvent、NewMessageEvent）各自延伸出自己的資料欄位，FSM 核心只認得這個抽象型別"
+    note for Transition "A transition is applicable when: current state equals from, Trigger recognizes Event, and Guard is satisfied."
+    note for AndGuard "isSatisfied(event) 依序呼叫每個子 guards[i].isSatisfied(event)，全部為 true 才回傳 true，遇到 false 立即短路；用來表達「多條件同時成立」，如 king 指令的 AdminOnlyGuard + QuotaAvailableGuard(5)"
+    note for NotGuard "isSatisfied(event) 回傳所持有 guard.isSatisfied(event) 的反向值；用來表達同一個條件的相反分支，避免為正反兩種情況各寫一個具體 Guard，如 OnlineCountAtLeastGuard(10) 取反即可表達「線上人數 < 10」"
+    note for CompositeAction "execute(event) 依序呼叫每個子 actions[i].execute(event)；用來讓一條 Transition 掛上一串行為，如 king 指令的 DeductQuotaAction(5) + CreateGameAction()"
