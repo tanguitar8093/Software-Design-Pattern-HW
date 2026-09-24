@@ -1,0 +1,524 @@
+classDiagram
+    direction LR
+
+    %% ======================= 本檔案是 oodv4-4.mmd 的差異版，只新增，不更動原有任何一行 =======================
+    %% 新增項目（解決「Bot 怎麼拿到 WaterCommunity 持有的 EventPublisher 去 register(this)」這個缺口）：
+    %% 1. WaterCommunity 新增 +getEventPublisher() EventPublisher 方法
+    %% 2. 新增 WaterCommunity "1" *-- "1" EventPublisher : 擁有（原圖只畫了 ChatRoom/Forum/Broadcast 三個 *--）
+    %% 3. 新增 Bot ..> WaterCommunity : getEventPublisher()（Bot 建構時透過 community 拿到 EventPublisher 再 register(this)）
+
+    %% ======================= 社群基礎設施 (Waterball Community) =======================
+    class WaterCommunity {
+        -currentTime: DateTime
+        +login(participant: Participant) void
+        +logout(participantId: str) void
+        +elapseTime(amount: int, unit: str) void
+        +getOnlineParticipants() list~Participant~
+        +getOnlineCount() int
+        +getEventPublisher() EventPublisher
+    }
+
+    class Participant {
+        <<abstract>>
+        -id: str
+    }
+
+    class Member {
+        -role: int
+        +sendMessage(chatRoom: ChatRoom, content: str, tags: list~str~) void
+        +publishPost(forum: Forum, title: str, content: str, tags: list~str~) void
+        +commentPost(forum: Forum, postId: str, content: str, tags: list~str~) void
+        +startBroadcast(broadcast: Broadcast) void
+        +speak(broadcast: Broadcast, content: str) void
+        +stopBroadcast(broadcast: Broadcast) void
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN = "ADMIN"
+        MEMBER = "MEMBER"
+    }
+
+    Participant <|-- Member
+    Member --> Role : role
+    WaterCommunity "1" o-- "0..*" Participant : 線上參與者
+    WaterCommunity "1" *-- "1" ChatRoom : 擁有
+    WaterCommunity "1" *-- "1" Forum : 擁有
+    WaterCommunity "1" *-- "1" Broadcast : 擁有
+    WaterCommunity "1" *-- "1" EventPublisher : 擁有
+
+    %% ======================= 聊天室 / 論壇 / 廣播 =======================
+    class ChatRoom {
+        +postMessage(message: Message) void
+    }
+
+    class Message {
+        -authorId: str
+        -content: str
+        -tags: list~str~
+    }
+
+    class Forum {
+        +createPost(post: Post) void
+        +addComment(postId: str, comment: Comment) void
+        +getPost(id: str) Post
+    }
+
+    class Post {
+        -id: str
+        -authorId: str
+        -title: str
+        -content: str
+        -tags: list~str~
+        +addComment(comment: Comment) void
+    }
+
+    class Comment {
+        -authorId: str
+        -content: str
+        -tags: list~str~
+    }
+
+    class Broadcast {
+        -currentSpeakerId: str
+        +start(speakerId: str) void
+        +speak(voiceMessage: VoiceMessage) void
+        +stop(speakerId: str) void
+        +isBroadcasting() bool
+    }
+
+    class VoiceMessage {
+        -speakerId: str
+        -content: str
+    }
+
+    ChatRoom "1" o-- "0..*" Message
+    Forum "1" o-- "0..*" Post
+    Post "1" o-- "0..*" Comment
+    Broadcast "1" o-- "0..*" VoiceMessage
+
+    Member ..> ChatRoom : 交流 下指令
+    Member ..> Forum : 論壇發布/留言
+    Member ..> Broadcast : 語音廣播操作
+
+    %% ======================= FSM 模組（外部依賴，完整定義見 fsm-ooa-4.mmd） =======================
+    class Event {
+        <<interface>>
+    }
+
+    class Trigger {
+        <<interface>>
+        +isTriggeredBy(event: Event) bool
+    }
+
+    note for Event "N30"
+    note for Trigger "N30"
+
+    %% ======================= Domain Event / Event Publisher =======================
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+
+    class MessagePostedEvent {
+        -message: Message
+        +getSourceId() str|None
+    }
+    class PostCreatedEvent {
+        -post: Post
+        +getSourceId() str|None
+    }
+    class CommentAddedEvent {
+        -comment: Comment
+        +getSourceId() str|None
+    }
+    class BroadcastStartedEvent {
+        -speakerId: str
+        +getSourceId() str|None
+    }
+    class BroadcastStoppedEvent {
+        -speakerId: str
+        +getSourceId() str|None
+    }
+    class VoiceSpokenEvent {
+        -voiceMessage: VoiceMessage
+        +getSourceId() str|None
+    }
+    class LoginEvent {
+        -userId: str
+        -isAdmin: bool
+        +getSourceId() str|None
+    }
+    class LogoutEvent {
+        -userId: str
+        +getSourceId() str|None
+    }
+    class TimeElapsedEvent {
+        -amount: int
+        -unit: str
+        +getSourceId() str|None
+    }
+
+    Event <|.. DomainEvent
+    DomainEvent <|.. MessagePostedEvent
+    DomainEvent <|.. PostCreatedEvent
+    DomainEvent <|.. CommentAddedEvent
+    DomainEvent <|.. BroadcastStartedEvent
+    DomainEvent <|.. BroadcastStoppedEvent
+    DomainEvent <|.. VoiceSpokenEvent
+    DomainEvent <|.. LoginEvent
+    DomainEvent <|.. LogoutEvent
+    DomainEvent <|.. TimeElapsedEvent
+
+    class CommunityObserver {
+        <<interface>>
+        +getId() str
+        +onEvent(event: DomainEvent) void
+    }
+
+    class EventPublisher {
+        -observers: list~CommunityObserver~
+        +register(observer: CommunityObserver) void
+        +unregister(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+
+    EventPublisher "1" o-- "0..*" CommunityObserver : observers
+    ChatRoom ..> EventPublisher : notify(MessagePostedEvent)
+    Forum ..> EventPublisher : notify(PostCreatedEvent/CommentAddedEvent)
+    Broadcast ..> EventPublisher : notify(BroadcastStarted/Stopped/VoiceSpokenEvent)
+    WaterCommunity ..> EventPublisher : notify(LoginEvent/LogoutEvent/TimeElapsedEvent)
+
+    %% ======================= 具體 Trigger（implements Trigger，判斷各種 DomainEvent 是否命中） =======================
+    class CommandTrigger {
+        -command: str
+        +isTriggeredBy(event: Event) bool
+    }
+    class MentionsBotTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+    class LoginTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+    class LogoutTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+    class BroadcastStartedTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+    class BroadcastStoppedTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+    class TimeElapsedTrigger {
+        +isTriggeredBy(event: Event) bool
+    }
+
+    Trigger <|.. CommandTrigger
+    Trigger <|.. MentionsBotTrigger
+    Trigger <|.. LoginTrigger
+    Trigger <|.. LogoutTrigger
+    Trigger <|.. BroadcastStartedTrigger
+    Trigger <|.. BroadcastStoppedTrigger
+    Trigger <|.. TimeElapsedTrigger
+
+    CommandTrigger ..> MessagePostedEvent : 比對 content/tags
+    MentionsBotTrigger ..> MessagePostedEvent : 比對 tags
+    LoginTrigger ..> LoginEvent : 型別比對
+    LogoutTrigger ..> LogoutEvent : 型別比對
+    BroadcastStartedTrigger ..> BroadcastStartedEvent : 型別比對
+    BroadcastStoppedTrigger ..> BroadcastStoppedEvent : 型別比對
+    TimeElapsedTrigger ..> TimeElapsedEvent : 型別比對
+
+    note for CommandTrigger "N31"
+    note for MentionsBotTrigger "N34"
+    note for LoginTrigger "N32"
+    note for LogoutTrigger "N32"
+    note for BroadcastStartedTrigger "N33"
+    note for BroadcastStoppedTrigger "N33"
+    note for TimeElapsedTrigger "N35"
+
+    %% ======================= FSM 模組（State/FSM 骨架，完整定義見 fsm-ooa-4.mmd） =======================
+    class StateNode {
+        <<interface>>
+        +onEnter(event: Event) void
+        +onExit(event: Event) void
+        +fire(event: Event) bool
+    }
+
+    class State {
+        +enter: Action
+        +exit: Action
+        +onEnter(event: Event) void
+        +onExit(event: Event) void
+        +fire(event: Event) bool
+    }
+
+    class FiniteStateMachine {
+        -currentState: StateNode
+        -initialStateSelector: InitialStateSelector
+        -transitions: Transition[*]
+        +addTransition(transition: Transition) void
+        +fire(event: Event) bool
+    }
+
+    class InitialStateSelector {
+        <<interface>>
+        +select(event: Event) StateNode
+    }
+
+    StateNode <|.. State
+    StateNode <|.. FiniteStateMachine
+    FiniteStateMachine "1" --> "1" InitialStateSelector : initialStateSelector
+
+    note for FiniteStateMachine "N9"
+    note for InitialStateSelector "N36"
+
+    class Guard {
+        <<interface>>
+        +isSatisfied(event: Event) bool
+    }
+
+    class Action {
+        <<interface>>
+        +execute(event: Event) void
+    }
+
+    note for Guard "N9"
+    note for Action "N9"
+
+    %% ======================= 重用板 InitialStateSelector（Composite over Strategy，本圖直接使用） =======================
+    class GuardedInitialStateSelector {
+        -candidates: (Guard, StateNode)[*]
+        -fallback: StateNode
+        +select(event: Event) StateNode
+    }
+
+    InitialStateSelector <|.. GuardedInitialStateSelector
+    GuardedInitialStateSelector "1" o-- "1..*" Guard : candidates
+    GuardedInitialStateSelector "1" o-- "1..*" StateNode : candidates
+    GuardedInitialStateSelector "1" --> "1" StateNode : fallback
+
+    note for GuardedInitialStateSelector "N36"
+
+    %% ======================= Bot 主體 =======================
+    class Bot {
+        -id: str = "bot"
+        -quota: int
+        -description: str
+        -rootFsm: FiniteStateMachine
+        +onEvent(event: DomainEvent) void
+        +replyChatMessage(content: str, tags: list~str~) void
+        +commentPost(postId: str, content: str, tags: list~str~) void
+        +broadcastVoice(content: str) void
+    }
+
+    CommunityObserver <|.. Bot
+    Bot "1" --> "1" FiniteStateMachine : rootFsm
+    Bot ..> ChatRoom : replyChatMessage()
+    Bot ..> Forum : commentPost()
+    Bot ..> Broadcast : broadcastVoice()
+    Bot ..> WaterCommunity : getEventPublisher()
+    Bot --> EventPublisher : register(this)
+
+    note for Bot "N10"
+
+    %% ======================= 具體狀態（擴充 FSM 模組的 State） =======================
+    class DefaultConversationState {
+        -replyCycleIndex: int
+        +getNextReplyMessage() str
+    }
+    class InteractingState {
+        -replyCycleIndex: int
+        +getNextReplyMessage() str
+    }
+    class WaitingState
+    class RecordingState {
+        -session: RecordingSession
+    }
+    class QuestioningState {
+        -game: KnowledgeKingGame
+    }
+    class ThanksForJoiningState {
+        -game: KnowledgeKingGame
+    }
+
+    State <|-- DefaultConversationState
+    State <|-- InteractingState
+    State <|-- WaitingState
+    State <|-- RecordingState
+    State <|-- QuestioningState
+    State <|-- ThanksForJoiningState
+
+    RecordingState "1" --> "0..1" RecordingSession : 進行錄音會話
+    QuestioningState "1" --> "1" KnowledgeKingGame : 主持知識王遊戲
+    ThanksForJoiningState "1" --> "1" KnowledgeKingGame : 主持知識王遊戲
+
+    %% ======================= 錄音 / 知識王 子領域 =======================
+    class RecordingSession {
+        -recorderId: str
+        +addVoice(message: VoiceMessage) void
+        +generateReplay() str
+    }
+    RecordingSession ..> VoiceMessage : 使用
+
+    class KnowledgeKingGame {
+        -currentQuestionIndex: int
+        -startTime: DateTime
+        +getCurrentQuestion() Question
+        +submitAnswer(memberId: str, answer: str) bool
+        +isFinished() bool
+        +isTimeout(currentTime: DateTime) bool
+        +getWinner() str
+    }
+    class Question {
+        -number: int
+        -description: str
+        -options: list~str~
+        -correctAnswer: str
+        +isCorrect(answer: str) bool
+    }
+    KnowledgeKingGame "1" o-- "3" Question : 包含題目
+
+    note for Participant "N1"
+    note for Member "N2"
+    note for WaterCommunity "N3"
+    note for EventPublisher "N4"
+    note for ChatRoom "N5"
+    note for Forum "N6"
+    note for DomainEvent "N7"
+    note for CommunityObserver "N8"
+    note for KnowledgeKingGame "N11"
+
+    %% ======================= 通用組合器（Composite over Strategy，Bot 模組直接使用，不知道任何業務名詞） =======================
+    class AndGuard {
+        -guards: Guard[*]
+        +isSatisfied(event: Event) bool
+    }
+
+    class NotGuard {
+        -guard: Guard
+        +isSatisfied(event: Event) bool
+    }
+
+    class CompositeAction {
+        -actions: Action[*]
+        +execute(event: Event) void
+    }
+
+    Guard <|.. AndGuard
+    Guard <|.. NotGuard
+    Action <|.. CompositeAction
+    AndGuard "1" o-- "2..*" Guard : guards
+    NotGuard "1" --> "1" Guard : guard
+    CompositeAction "1" o-- "2..*" Action : actions
+
+    note for AndGuard "N13"
+    note for NotGuard "N14"
+    note for CompositeAction "N15"
+
+    %% ======================= Bot 專用具體 Guard（8 個，implements Guard） =======================
+    class OnlineCountAtLeastGuard {
+        -threshold: int
+        +isSatisfied(event: Event) bool
+    }
+    class IsBroadcastingGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class AdminOnlyGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class QuotaAvailableGuard {
+        -cost: int
+        +isSatisfied(event: Event) bool
+    }
+    class CorrectAnswerGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class GameFinishedGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class IsRecorderGuard {
+        +isSatisfied(event: Event) bool
+    }
+    class DurationElapsedGuard {
+        -duration: int
+        -unit: str
+        +isSatisfied(event: Event) bool
+    }
+
+    Guard <|.. OnlineCountAtLeastGuard
+    Guard <|.. IsBroadcastingGuard
+    Guard <|.. AdminOnlyGuard
+    Guard <|.. QuotaAvailableGuard
+    Guard <|.. CorrectAnswerGuard
+    Guard <|.. GameFinishedGuard
+    Guard <|.. IsRecorderGuard
+    Guard <|.. DurationElapsedGuard
+
+    OnlineCountAtLeastGuard ..> WaterCommunity : getOnlineCount()
+    IsBroadcastingGuard ..> Broadcast : isBroadcasting()
+    AdminOnlyGuard ..> Member : role
+    QuotaAvailableGuard ..> Bot : quota
+    CorrectAnswerGuard ..> KnowledgeKingGame : submitAnswer()
+    GameFinishedGuard ..> KnowledgeKingGame : isFinished()
+    IsRecorderGuard ..> RecordingSession : recorderId
+    DurationElapsedGuard ..> WaterCommunity : currentTime
+    DurationElapsedGuard ..> KnowledgeKingGame : startTime
+    DurationElapsedGuard ..> ThanksForJoiningState : 進場時間
+
+    note for OnlineCountAtLeastGuard "N16"
+    note for IsBroadcastingGuard "N17"
+    note for AdminOnlyGuard "N18"
+    note for QuotaAvailableGuard "N19"
+    note for CorrectAnswerGuard "N20"
+    note for GameFinishedGuard "N21"
+    note for IsRecorderGuard "N22"
+    note for DurationElapsedGuard "N23"
+
+    %% ======================= Bot 專用具體 Action（6 個，implements Action） =======================
+    class CommentPostAction {
+        -text: str
+        -tagsProvider: Callable
+        +execute(event: Event) void
+    }
+    class FlushRecordReplayAction {
+        +execute(event: Event) void
+    }
+    class DeductQuotaAction {
+        -cost: int
+        +execute(event: Event) void
+    }
+    class CreateRecordingSessionAction {
+        +execute(event: Event) void
+    }
+    class CreateKnowledgeKingGameAction {
+        +execute(event: Event) void
+    }
+    class SendChatMessageAction {
+        -contentProvider: Callable
+        +execute(event: Event) void
+    }
+
+    Action <|.. CommentPostAction
+    Action <|.. FlushRecordReplayAction
+    Action <|.. DeductQuotaAction
+    Action <|.. CreateRecordingSessionAction
+    Action <|.. CreateKnowledgeKingGameAction
+    Action <|.. SendChatMessageAction
+
+    CommentPostAction ..> Forum : addComment()
+    FlushRecordReplayAction ..> RecordingSession : generateReplay()
+    FlushRecordReplayAction ..> Bot : replyChatMessage()
+    DeductQuotaAction ..> Bot : quota
+    CreateRecordingSessionAction ..> RecordingSession : 建立
+    CreateRecordingSessionAction ..> RecordingState : 附掛
+    CreateKnowledgeKingGameAction ..> KnowledgeKingGame : 建立
+    CreateKnowledgeKingGameAction ..> QuestioningState : 附掛
+    SendChatMessageAction ..> Bot : replyChatMessage()
+
+    note for CommentPostAction "N24"
+    note for FlushRecordReplayAction "N25"
+    note for DeductQuotaAction "N26"
+    note for CreateRecordingSessionAction "N27"
+    note for CreateKnowledgeKingGameAction "N28"
+    note for SendChatMessageAction "N29"
