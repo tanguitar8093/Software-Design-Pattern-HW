@@ -9,25 +9,35 @@ class Question:
         self.correctAnswer = correctAnswer
 
     def isCorrect(self, answer: str) -> bool:
-        raise NotImplementedError
+        return answer == self.correctAnswer
 
 
 class KnowledgeKingGame:
-    def __init__(self, currentQuestionIndex: int, startTime: DateTime):
+    def __init__(self, questions: list[Question], startTime: DateTime, currentQuestionIndex: int = 0):
+        self.questions = questions  # 對應圖上被跳過的 KnowledgeKingGame o-- "3" Question 組合線
         self.currentQuestionIndex = currentQuestionIndex
         self.startTime = startTime
+        self._scores: dict[str, int] = {}
 
     def getCurrentQuestion(self) -> Question:
-        raise NotImplementedError
+        return self.questions[self.currentQuestionIndex]
 
     def submitAnswer(self, memberId: str, answer: str) -> bool:
-        raise NotImplementedError
+        is_correct = self.getCurrentQuestion().isCorrect(answer)
+        if is_correct:
+            self._scores[memberId] = self._scores.get(memberId, 0) + 1
+            self.currentQuestionIndex += 1
+        return is_correct
 
     def isFinished(self) -> bool:
-        raise NotImplementedError
+        return self.currentQuestionIndex >= len(self.questions)
 
     def isTimeout(self, currentTime: DateTime) -> bool:
-        raise NotImplementedError
+        return (currentTime - self.startTime).total_seconds() >= 3600
 
     def getWinner(self) -> str:
-        raise NotImplementedError
+        if not self._scores:
+            return "Tie"
+        highest = max(self._scores.values())
+        winners = [memberId for memberId, score in self._scores.items() if score == highest]
+        return winners[0] if len(winners) == 1 else "Tie"

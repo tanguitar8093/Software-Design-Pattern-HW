@@ -18,10 +18,13 @@ class EventPublisher:
         self.observers = observers
 
     def register(self, observer: CommunityObserver) -> None:
-        raise NotImplementedError
+        if observer not in self.observers:
+            self.observers.append(observer)
 
     def unregister(self, observer: CommunityObserver) -> None:
-        raise NotImplementedError
+        if observer in self.observers:
+            self.observers.remove(observer)
 
     def notify(self, event: DomainEvent) -> None:
-        raise NotImplementedError
+        for observer in self.observers:
+            observer.onEvent(event)

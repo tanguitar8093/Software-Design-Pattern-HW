@@ -6,7 +6,7 @@ class AndGuard(Guard):
         self.guards = guards
 
     def isSatisfied(self, event: Event) -> bool:
-        raise NotImplementedError
+        return all(guard.isSatisfied(event) for guard in self.guards)
 
 
 class NotGuard(Guard):
@@ -14,7 +14,7 @@ class NotGuard(Guard):
         self.guard = guard
 
     def isSatisfied(self, event: Event) -> bool:
-        raise NotImplementedError
+        return not self.guard.isSatisfied(event)
 
 
 class CompositeAction(Action):
@@ -22,4 +22,5 @@ class CompositeAction(Action):
         self.actions = actions
 
     def execute(self, event: Event) -> None:
-        raise NotImplementedError
+        for action in self.actions:
+            action.execute(event)
