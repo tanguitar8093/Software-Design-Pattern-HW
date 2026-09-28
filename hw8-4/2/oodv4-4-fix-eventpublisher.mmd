@@ -6,6 +6,8 @@ classDiagram
     %% 1. WaterCommunity 新增 +getEventPublisher() EventPublisher 方法
     %% 2. 新增 WaterCommunity "1" *-- "1" EventPublisher : 擁有（原圖只畫了 ChatRoom/Forum/Broadcast 三個 *--）
     %% 3. 新增 Bot ..> WaterCommunity : getEventPublisher()（Bot 建構時透過 community 拿到 EventPublisher 再 register(this)）
+    %% 4. 新增兩則便條紙，說明「Bot 建構時怎麼組裝 Transition」「具體 Guard/Action 的領域物件參照從哪來」
+    %%    這兩件事屬於動態組裝時序，class diagram 的靜態關係線本來就畫不出來，用文字便條紙交代即可
 
     %% ======================= 社群基礎設施 (Waterball Community) =======================
     class WaterCommunity {
@@ -16,6 +18,7 @@ classDiagram
         +getOnlineParticipants() list~Participant~
         +getOnlineCount() int
         +getEventPublisher() EventPublisher
+        +postBotReply(content: str, tags: list~str~) void
     }
 
     class Participant {
@@ -285,6 +288,7 @@ classDiagram
 
     note for Guard "N9"
     note for Action "N9"
+    note for Guard "N38"
 
     %% ======================= 重用板 InitialStateSelector（Composite over Strategy，本圖直接使用） =======================
     class GuardedInitialStateSelector {
@@ -314,13 +318,17 @@ classDiagram
 
     CommunityObserver <|.. Bot
     Bot "1" --> "1" FiniteStateMachine : rootFsm
-    Bot ..> ChatRoom : replyChatMessage()
     Bot ..> Forum : commentPost()
     Bot ..> Broadcast : broadcastVoice()
     Bot ..> WaterCommunity : getEventPublisher()
+    Bot ..> WaterCommunity : postBotReply()
     Bot --> EventPublisher : register(this)
+    WaterCommunity ..> ChatRoom : postMessage()
 
     note for Bot "N10"
+    note for Bot "N37"
+    note for Bot "N39"
+    note for WaterCommunity "N39"
 
     %% ======================= 具體狀態（擴充 FSM 模組的 State） =======================
     class DefaultConversationState {

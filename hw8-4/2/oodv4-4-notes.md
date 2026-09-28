@@ -4,6 +4,9 @@
 `TimeElapsedTrigger`、`MentionsBotTrigger` 兩個 Trigger，以及 `InitialStateSelector`/`GuardedInitialStateSelector`；
 `Bot` 沒有拆出 Factory。N1～N33 內容與 oodv4-3 相同，這裡只列新增的 N34～N36。
 
+[oodv4-4-fix-eventpublisher.mmd](oodv4-4-fix-eventpublisher.mmd) 在 oodv4-4 基礎上補上 `WaterCommunity.getEventPublisher()`、
+`WaterCommunity.postBotReply()` 兩個方法與相關關聯線，新增 N37～N39。
+
 ## N1 — Participant
 
 代表社群中活生生的人，是所有社群社交、內容創作、語音交流以及參與操作的憑證持有者。
@@ -242,3 +245,25 @@ Record 各自開一個具體 Selector 子類別，而是拿一串 `(Guard, State
 - **Record 用**：`candidates=[(IsBroadcastingGuard(), RecordingState)]`，`fallback=WaitingState`
 
 兩處都重用已經畫好的 `OnlineCountAtLeastGuard`/`IsBroadcastingGuard`，不用再多寫一顆判斷邏輯。
+
+## N37 — Bot 建構子組裝時序
+
+`Bot` 建構子內部自行完成所有 `Transition`/`Trigger`/`Guard`/`Action`/`InitialStateSelector` 的組裝並掛進
+`rootFsm`，這段動態組裝時序無法用 class diagram 的靜態關聯線表達，需參照循序圖或程式碼建構子。
+
+## N38 — Guard / Action 建構參照供應鏈
+
+具體 `Guard`/`Action`（如 `OnlineCountAtLeastGuard`、`CommentPostAction`）建構時需要的領域物件參照
+（`Forum`/`Broadcast`/`WaterCommunity` 等），皆由 `Bot` 建構子在組裝 `Transition` 當下一併傳入建構子參數，
+本圖不畫這條供應鏈，屬於建構時序範疇。
+
+## N39 — Bot.replyChatMessage / WaterCommunity.postBotReply 委派鏈
+
+`SendChatMessageAction.execute()` 呼叫 `Bot.replyChatMessage(content, tags)`；`Bot` 自己沒有 `ChatRoom` 的
+參照，因此內部直接委派呼叫 `WaterCommunity.postBotReply(content, tags)`。
+
+`WaterCommunity.postBotReply(content, tags)` 才是真正知道 `ChatRoom` 存在的一層：內部組裝
+`Message(authorId="bot", content, tags)`，再呼叫自己持有的 `chatRoom.postMessage(message)`。
+
+兩個方法簽名相同（`content: str, tags: list<str>`）但職責不同：`Bot` 那層決定「要回什麼內容」，
+`WaterCommunity` 那層決定「怎麼把內容真的送進聊天室」。
