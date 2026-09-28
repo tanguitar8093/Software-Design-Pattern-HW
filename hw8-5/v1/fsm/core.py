@@ -1,4 +1,3 @@
-# Transition 為 FSM 模組外部依賴（完整定義見 fsm-ooa-4.mmd），此檔案不重複定義，僅以字串型別註記引用。
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -45,13 +44,13 @@ class State(StateNode):
         self.exit = exit
 
     def onEnter(self, event: Event) -> None:
-        raise NotImplementedError
+        self.enter.execute(event)
 
     def onExit(self, event: Event) -> None:
-        raise NotImplementedError
+        self.exit.execute(event)
 
     def fire(self, event: Event) -> bool:
-        raise NotImplementedError
+        return False
 
 
 class InitialStateSelector(ABC):
@@ -60,25 +59,62 @@ class InitialStateSelector(ABC):
         raise NotImplementedError
 
 
+class Transition:
+    def __init__(
+        self,
+        from_: StateNode,
+        trigger: Trigger,
+        to: StateNode,
+        guard: Optional[Guard] = None,
+        action: Optional[Action] = None,
+    ):
+        self.from_ = from_
+        self.trigger = trigger
+        self.guard = guard
+        self.action = action
+        self.to = to
+
+    def isApplicable(self, currentState: StateNode, event: Event) -> bool:
+        if currentState is not self.from_:
+            return False
+        if not self.trigger.isTriggeredBy(event):
+            return False
+        if self.guard is not None and not self.guard.isSatisfied(event):
+            return False
+        return True
+
+
 class FiniteStateMachine(StateNode):
     def __init__(
         self,
         currentState: Optional[StateNode],
         initialStateSelector: InitialStateSelector,
-        transitions: "list[Transition]",
+        transitions: list[Transition],
     ):
         self.currentState = currentState
         self.initialStateSelector = initialStateSelector
         self.transitions = transitions
 
-    def addTransition(self, transition: "Transition") -> None:
-        raise NotImplementedError
+    def addTransition(self, transition: Transition) -> None:
+        self.transitions.append(transition)
 
     def onEnter(self, event: Event) -> None:
-        raise NotImplementedError
+        self.currentState = self.initialStateSelector.select(event)
+        self.currentState.onEnter(event)
 
     def onExit(self, event: Event) -> None:
-        raise NotImplementedError
+        if self.currentState is not None:
+            self.currentState.onExit(event)
 
     def fire(self, event: Event) -> bool:
-        raise NotImplementedError
+        if self.currentState is not None and self.currentState.fire(event):
+            return True
+        for transition in self.transitions:
+            if transition.isApplicable(self.currentState, event):
+                self.currentState.onExit(event)
+                if transition.action is not None:
+                    transition.action.execute(event)
+                self.currentState = transition.to
+                self.currentState.onEnter(event)
+                return True
+        return False

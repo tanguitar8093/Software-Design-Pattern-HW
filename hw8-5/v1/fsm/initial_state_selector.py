@@ -7,4 +7,7 @@ class GuardedInitialStateSelector(InitialStateSelector):
         self.fallback = fallback
 
     def select(self, event: Event) -> StateNode:
-        raise NotImplementedError
+        for guard, state in self.candidates:
+            if guard.isSatisfied(event):
+                return state
+        return self.fallback
