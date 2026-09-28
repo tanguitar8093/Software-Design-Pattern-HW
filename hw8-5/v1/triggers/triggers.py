@@ -1,3 +1,10 @@
+from ..events.domain_events import (
+    BroadcastStartedEvent,
+    BroadcastStoppedEvent,
+    LoginEvent,
+    LogoutEvent,
+    TimeElapsedEvent,
+)
 from ..fsm.core import Event, Trigger
 
 
@@ -16,24 +23,24 @@ class MentionsBotTrigger(Trigger):
 
 class LoginTrigger(Trigger):
     def isTriggeredBy(self, event: Event) -> bool:
-        raise NotImplementedError
+        return isinstance(event, LoginEvent)
 
 
 class LogoutTrigger(Trigger):
     def isTriggeredBy(self, event: Event) -> bool:
-        raise NotImplementedError
+        return isinstance(event, LogoutEvent)
 
 
 class BroadcastStartedTrigger(Trigger):
     def isTriggeredBy(self, event: Event) -> bool:
-        raise NotImplementedError
+        return isinstance(event, BroadcastStartedEvent)
 
 
 class BroadcastStoppedTrigger(Trigger):
     def isTriggeredBy(self, event: Event) -> bool:
-        raise NotImplementedError
+        return isinstance(event, BroadcastStoppedEvent)
 
 
 class TimeElapsedTrigger(Trigger):
     def isTriggeredBy(self, event: Event) -> bool:
-        raise NotImplementedError
+        return isinstance(event, TimeElapsedEvent)

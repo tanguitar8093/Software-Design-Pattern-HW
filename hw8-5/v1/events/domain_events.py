@@ -16,7 +16,7 @@ class MessagePostedEvent(DomainEvent):
         self.message = message
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.message.authorId
 
 
 class PostCreatedEvent(DomainEvent):
@@ -24,7 +24,7 @@ class PostCreatedEvent(DomainEvent):
         self.post = post
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.post.authorId
 
 
 class CommentAddedEvent(DomainEvent):
@@ -32,7 +32,7 @@ class CommentAddedEvent(DomainEvent):
         self.comment = comment
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.comment.authorId
 
 
 class BroadcastStartedEvent(DomainEvent):
@@ -40,7 +40,7 @@ class BroadcastStartedEvent(DomainEvent):
         self.speakerId = speakerId
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.speakerId
 
 
 class BroadcastStoppedEvent(DomainEvent):
@@ -48,7 +48,7 @@ class BroadcastStoppedEvent(DomainEvent):
         self.speakerId = speakerId
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.speakerId
 
 
 class VoiceSpokenEvent(DomainEvent):
@@ -56,7 +56,7 @@ class VoiceSpokenEvent(DomainEvent):
         self.voiceMessage = voiceMessage
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.voiceMessage.speakerId
 
 
 class LoginEvent(DomainEvent):
@@ -65,7 +65,7 @@ class LoginEvent(DomainEvent):
         self.isAdmin = isAdmin
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.userId
 
 
 class LogoutEvent(DomainEvent):
@@ -73,7 +73,7 @@ class LogoutEvent(DomainEvent):
         self.userId = userId
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return self.userId
 
 
 class TimeElapsedEvent(DomainEvent):
@@ -82,4 +82,4 @@ class TimeElapsedEvent(DomainEvent):
         self.unit = unit
 
     def getSourceId(self) -> Optional[str]:
-        raise NotImplementedError
+        return None
