@@ -7,6 +7,11 @@
 [oodv4-4-fix-eventpublisher.mmd](oodv4-4-fix-eventpublisher.mmd) 在 oodv4-4 基礎上補上 `WaterCommunity.getEventPublisher()`、
 `WaterCommunity.postBotReply()` 兩個方法與相關關聯線，新增 N37～N39。
 
+[oodv4-5-bot-facade-consistency.mmd](oodv4-5-bot-facade-consistency.mmd) 把 `OnlineCountAtLeastGuard`/`IsBroadcastingGuard`/
+`AdminOnlyGuard`/`DurationElapsedGuard`/`CreateKnowledgeKingGameAction` 改成統一經由 `Bot` 存取，不冗新增 N。
+
+[oodv4-6-botfacade.mmd](oodv4-6-botfacade.mmd) 新增 `BotFacade`、`InternalReaction` 兩個類別，新增 N40～N42。
+
 ## N1 — Participant
 
 代表社群中活生生的人，是所有社群社交、內容創作、語音交流以及參與操作的憑證持有者。
@@ -267,3 +272,32 @@ Record 各自開一個具體 Selector 子類別，而是拿一串 `(Guard, State
 
 兩個方法簽名相同（`content: str, tags: list<str>`）但職責不同：`Bot` 那層決定「要回什麼內容」，
 `WaterCommunity` 那層決定「怎麼把內容真的送進聊天室」。
+
+## N40 — Bot.internalReactions / addInternalReaction / 找 leaf state
+
+`Bot.onEvent(event)` 固定順序：先呼叫 `rootFsm.fire(event)`（可能換狀態），接著沿著
+`rootFsm.currentState` 這條鏈一路往下走（如果目前站的是巢狀 `FiniteStateMachine` 就繼續往它的
+`currentState` 走，直到走到一個不是 `FiniteStateMachine` 的 `StateNode` 為止），找出「目前真正作用中的
+leaf state」，再逐一比對 `internalReactions[*]`，命中就執行對應 `Action`。
+
+這條路徑完全獨立於 `fire()`：不管這次事件有沒有換到新狀態，只要目前 leaf state 命中某個
+`InternalReaction`，就會執行，用來處理「訊息輪播」「論壇留言」這類不管換不換狀態都要發生的原地反應。
+`addInternalReaction()` 讓外部（`BotFacade`）可以在組裝階段陸續掛上去，跟 `FiniteStateMachine.addTransition()`
+同一種「先建物件、事後掛」風格。
+
+## N41 — BotFacade
+
+對外唯一入口，把「組一堆 State/Guard/Action/Trigger/Transition/InternalReaction 才能生出一個能動的
+Bot」這整套複雜度包起來，App 層以後只需要 `BotFacade(community)`，完全不用知道 `Bot` 建構子要吃
+`rootFsm` 這種內部細節。設計邏輯對照 `hw8-5/景點-門面模式/v2` 的 `StatsFacade`：`Main` 不需要知道
+`MarkdownParser`/`TableStatsPerformer`/`TotalColumn` 存在，這裡 App 層也不需要知道 `State`/`Guard`/
+`Action`/`Transition` 存在。
+
+目前只示範 `king` 指令一條 `Transition` 加上訊息輪播一條 `InternalReaction`，其餘指令、複合狀態、
+答題/錄音/超時相關邏輯尚未組裝完成。
+
+## N42 — InternalReaction
+
+只重用 FSM 模組既有的 `Trigger`/`Action` 介面，表達「目前 leaf state 是這個、且這個事件命中
+trigger，就執行這個 action，但不換狀態」。刻意放在 Bot 模組（不放進 `fsm/`），因為它認識「leaf
+state」這種只有 Bot 業務語意才有意義的概念，FSM 核心本身不能知道這件事存在。
