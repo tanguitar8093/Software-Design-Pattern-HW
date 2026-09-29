@@ -22,6 +22,7 @@ class Bot(CommunityObserver):
         self.quota = quota
         self.description = description
         self.rootFsm = rootFsm
+        self.recorderId: Optional[str] = None  # 目前這輪錄音的錄音者（下 record 指令的人），跨廣播週期不變
         self._community = community  # 全委派型：Bot 不持有 ChatRoom/Forum/Broadcast，一律透過 WaterCommunity 代理
         self._internalReactions = internalReactions or []
         community.getEventPublisher().register(self)
@@ -33,17 +34,21 @@ class Bot(CommunityObserver):
         self._internalReactions.append(reaction)
 
     def onEvent(self, event: DomainEvent) -> None:
-        self.rootFsm.fire(event)
+        # 先做原地反應（如輪播回覆），再處理狀態轉移：同一則訊息「先回覆、後切換狀態」是 README 明定的順序。
         activeLeafState = self._getActiveLeafState()
         for reaction in self._internalReactions:
             if reaction.isApplicable(activeLeafState, event):
                 reaction.action.execute(event)
+        self.rootFsm.fire(event)
 
     def _getActiveLeafState(self) -> Optional[StateNode]:
         node: Optional[StateNode] = self.rootFsm
         while isinstance(node, FiniteStateMachine):
             node = node.currentState
         return node
+
+    def getOnlineParticipantIds(self) -> list[str]:
+        return [self.id] + [participant.id for participant in self._community.getOnlineParticipants()]
 
     def replyChatMessage(self, content: str, tags: list[str]) -> None:
         self._community.postBotReply(content, tags)
@@ -55,7 +60,7 @@ class Bot(CommunityObserver):
         self._community.postBotVoice(content)
 
     def getOnlineCount(self) -> int:
-        return self._community.getOnlineCount()
+        return self._community.getOnlineCount() + 1  # 在線人數計算包含機器人自己（README 明定）
 
     def isBroadcasting(self) -> bool:
         return self._community.isBroadcasting()

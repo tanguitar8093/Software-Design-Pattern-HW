@@ -1,5 +1,7 @@
 from typing import Optional
 
+from datetime import datetime as DateTime
+
 from ..activities.knowledge_king import KnowledgeKingGame
 from ..activities.recording import RecordingSession
 from ..fsm.core import Action, State
@@ -46,6 +48,13 @@ class QuestioningState(State):
 
 
 class ThanksForJoiningState(State):
-    def __init__(self, enter: Action, exit: Action, game: Optional[KnowledgeKingGame] = None):
+    def __init__(
+        self,
+        enter: Action,
+        exit: Action,
+        game: Optional[KnowledgeKingGame] = None,
+        enteredAt: Optional[DateTime] = None,
+    ):
         super().__init__(enter, exit)
         self.game = game
+        self.enteredAt = enteredAt  # 進場時間戳記，給 20 秒後回 Normal 的 DurationElapsedGuard 用

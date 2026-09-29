@@ -4,9 +4,9 @@ from typing import Callable, Optional
 
 from ...community.community import Member, Role
 from ...events.domain_events import DomainEvent, MessagePostedEvent
-from ...fsm.core import Event, Guard
+from ...fsm.core import Event, FiniteStateMachine, Guard, StateNode
 from ..bot import Bot
-from ..states import QuestioningState, RecordingState
+from ..states import QuestioningState
 
 
 class OnlineCountAtLeastGuard(Guard):
@@ -71,13 +71,26 @@ class GameFinishedGuard(Guard):
 
 
 class IsRecorderGuard(Guard):
-    def __init__(self, recordingState: RecordingState):
-        self.recordingState = recordingState
+    """錄音者身分跟著 Bot.recorderId 走（下 record 指令的人），不綁定任何一次的 RecordingSession。"""
+
+    def __init__(self, bot: Bot):
+        self.bot = bot
 
     def isSatisfied(self, event: Event) -> bool:
         if not isinstance(event, MessagePostedEvent):
             return False
-        return event.getSourceId() == self.recordingState.session.recorderId
+        return event.getSourceId() == self.bot.recorderId
+
+
+class SubstateActiveGuard(Guard):
+    """通用組件：判斷某台複合 FSM 目前作用中的子狀態是不是指定的那一顆（給跨子狀態的最外層轉移用）。"""
+
+    def __init__(self, fsm: FiniteStateMachine, expected: StateNode):
+        self.fsm = fsm
+        self.expected = expected
+
+    def isSatisfied(self, event: Event) -> bool:
+        return self.fsm.currentState is self.expected
 
 
 class DurationElapsedGuard(Guard):

@@ -1,10 +1,13 @@
+from ...community.community import BOT_ID
 from ...events.domain_events import (
     BroadcastStartedEvent,
     BroadcastStoppedEvent,
     LoginEvent,
     LogoutEvent,
     MessagePostedEvent,
+    PostCreatedEvent,
     TimeElapsedEvent,
+    VoiceSpokenEvent,
 )
 from ...fsm.core import Event, Trigger
 
@@ -27,6 +30,25 @@ class MentionsBotTrigger(Trigger):
         if not isinstance(event, MessagePostedEvent):
             return False
         return BOT_TAG in event.message.tags
+
+
+class MessageFromMemberTrigger(Trigger):
+    """任何非機器人自己發出的聊天訊息，不要求標記機器人（輪播回覆用，跟 MentionsBotTrigger 不同）。"""
+
+    def isTriggeredBy(self, event: Event) -> bool:
+        if not isinstance(event, MessagePostedEvent):
+            return False
+        return event.message.authorId != BOT_ID
+
+
+class PostCreatedTrigger(Trigger):
+    def isTriggeredBy(self, event: Event) -> bool:
+        return isinstance(event, PostCreatedEvent)
+
+
+class VoiceSpokenTrigger(Trigger):
+    def isTriggeredBy(self, event: Event) -> bool:
+        return isinstance(event, VoiceSpokenEvent)
 
 
 class LoginTrigger(Trigger):

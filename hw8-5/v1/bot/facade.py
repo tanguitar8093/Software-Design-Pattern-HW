@@ -1,92 +1,314 @@
 from ..activities.knowledge_king import Question
 from ..community.community import WaterCommunity
-from ..fsm.core import Action, Event, FiniteStateMachine, StateNode, Transition
+from ..fsm.core import Action, Event, FiniteStateMachine, Transition
 from ..fsm.initial_state_selector import GuardedInitialStateSelector
 from .actions.composite import CompositeAction
-from .actions.concrete import CreateKnowledgeKingGameAction, DeductQuotaAction, SendChatMessageAction
+from .actions.concrete import (
+    AddVoiceToRecordingSessionAction,
+    AnnounceGameResultAction,
+    CarryGameToThanksForJoiningAction,
+    ClearRecorderAction,
+    CommentPostAction,
+    CreateKnowledgeKingGameAction,
+    CreateRecordingSessionAction,
+    DeductQuotaAction,
+    FlushRecordReplayAction,
+    ResetReplyCycleAction,
+    SendChatMessageAction,
+    SetRecorderAction,
+)
 from .bot import Bot
-from .guards.composite import AndGuard
-from .guards.concrete import AdminOnlyGuard, QuotaAvailableGuard
+from .guards.composite import AndGuard, NotGuard
+from .guards.concrete import (
+    AdminOnlyGuard,
+    CorrectAnswerGuard,
+    DurationElapsedGuard,
+    GameFinishedGuard,
+    IsBroadcastingGuard,
+    IsRecorderGuard,
+    OnlineCountAtLeastGuard,
+    QuotaAvailableGuard,
+    SubstateActiveGuard,
+)
 from .internal_reaction import InternalReaction
-from .states import DefaultConversationState, QuestioningState
-from .triggers.triggers import CommandTrigger, MentionsBotTrigger
+from .states import (
+    DefaultConversationState,
+    InteractingState,
+    QuestioningState,
+    RecordingState,
+    ThanksForJoiningState,
+    WaitingState,
+)
+from .triggers.triggers import (
+    BroadcastStartedTrigger,
+    BroadcastStoppedTrigger,
+    CommandTrigger,
+    LoginTrigger,
+    LogoutTrigger,
+    MentionsBotTrigger,
+    MessageFromMemberTrigger,
+    PostCreatedTrigger,
+    TimeElapsedTrigger,
+    VoiceSpokenTrigger,
+)
 
 
 class _NoopAction(Action):
-    """佔位用：示範範圍內的狀態還沒設計 entry/exit 行為，先用不做事的 Action 卡位。"""
+    """佔位用：部分狀態沒有額外的 entry/exit 行為，先用不做事的 Action 卡位。"""
 
     def execute(self, event: Event) -> None:
         pass
 
 
 class BotFacade:
-    """對外唯一入口：把「組一堆 State/Guard/Action/Trigger/Transition 才能生出 Bot」的複雜度包起來。
-
-    TODO（下一輪要補齊，目前只示範 king 指令 + 訊息輪播原地反應這兩條）：
-    - Normal/Record 兩個複合狀態（GuardedInitialStateSelector 版本）
-    - 剩下 4 個指令：record / stop-recording / play again / king-stop
-    - Questioning 答對/答錯/超時分支、ThanksForJoining 20 秒回 Normal
-    - 論壇留言（CommentPostAction）原地反應
-    """
+    """對外唯一入口：把「組一堆 State/Guard/Action/Trigger/Transition 才能生出 Bot」的複雜度包起來。"""
 
     def __init__(self, community: WaterCommunity, quota: int = 20, description: str = "Waterball 知識王機器人"):
-        states = self._buildStates()
-        rootFsm = self._buildRootFsm(states)
+        noop = _NoopAction()
+        default = DefaultConversationState(noop, noop, messages=["good to hear", "thank you", "How are you"])
+        interacting = InteractingState(noop, noop, messages=["Hi hi😁", "I like your idea!"])
+        waiting = WaitingState(noop, noop)
+        recording = RecordingState(noop, noop)
+        questioning = QuestioningState(noop, noop)
+        thanksForJoining = ThanksForJoiningState(noop, noop)
+
+        rootInitialStateSelector = GuardedInitialStateSelector([], default)
+        rootFsm = FiniteStateMachine(currentState=None, initialStateSelector=rootInitialStateSelector, transitions=[])
         bot = Bot(community=community, quota=quota, description=description, rootFsm=rootFsm)
 
-        self._wireKingTransition(rootFsm, states, bot)
-        self._wireInternalReactions(states, bot)
-        rootFsm.onEnter(None)  # 程式啟動時對根 FSM 呼叫一次，決定初始狀態
+        # 進場/離場行為要拿到 bot/state 自己的參照才能組，狀態建構完之後才回頭補上
+        default.enter = ResetReplyCycleAction(default)
+        interacting.enter = ResetReplyCycleAction(interacting)
+        recording.enter = CreateRecordingSessionAction(recording, bot)
+        recording.exit = FlushRecordReplayAction(bot, recording)
+        questioning.enter = SendChatMessageAction(bot, lambda event: self._formatQuestion(questioning))
+        thanksForJoining.enter = AnnounceGameResultAction(bot, thanksForJoining)
 
-        self.bot = bot
-
-    def _buildStates(self) -> dict[str, StateNode]:
-        noop = _NoopAction()
-        return {
-            "default": DefaultConversationState(noop, noop, messages=["嗨，我是知識王機器人！", "有事叫我就 tag 我 🙂"]),
-            "questioning": QuestioningState(noop, noop),
-        }
-
-    def _buildRootFsm(self, states: dict[str, StateNode]) -> FiniteStateMachine:
-        return FiniteStateMachine(
+        normalFsm = FiniteStateMachine(
             currentState=None,
-            initialStateSelector=GuardedInitialStateSelector([], states["default"]),
-            transitions=[],
+            initialStateSelector=GuardedInitialStateSelector([(OnlineCountAtLeastGuard(bot, 10), interacting)], default),
+            transitions=[
+                Transition(from_=default, trigger=LoginTrigger(), to=interacting, guard=OnlineCountAtLeastGuard(bot, 10)),
+                Transition(
+                    from_=interacting,
+                    trigger=LogoutTrigger(),
+                    to=default,
+                    guard=NotGuard(OnlineCountAtLeastGuard(bot, 10)),
+                ),
+            ],
         )
-
-    def _wireInternalReactions(self, states: dict[str, StateNode], bot: Bot) -> None:
-        defaultState = states["default"]
-        assert isinstance(defaultState, DefaultConversationState)
-        bot.addInternalReaction(
-            InternalReaction(
-                state=defaultState,
-                trigger=MentionsBotTrigger(),
-                action=SendChatMessageAction(bot, lambda event: defaultState.getNextReplyMessage()),
+        recordFsm = FiniteStateMachine(
+            currentState=None,
+            initialStateSelector=GuardedInitialStateSelector([(IsBroadcastingGuard(bot), recording)], waiting),
+            transitions=[
+                Transition(from_=waiting, trigger=BroadcastStartedTrigger(), to=recording),
+                Transition(from_=recording, trigger=BroadcastStoppedTrigger(), to=waiting),
+            ],
+        )
+        questions = self._buildQuestions()
+        correctAnswerGuard = CorrectAnswerGuard(questioning)
+        knowledgeKingFsm = FiniteStateMachine(
+            currentState=None,
+            initialStateSelector=GuardedInitialStateSelector([], questioning),
+            transitions=[
+                Transition(
+                    from_=questioning,
+                    trigger=MentionsBotTrigger(),
+                    to=thanksForJoining,
+                    guard=AndGuard([correctAnswerGuard, GameFinishedGuard(questioning)]),
+                    action=CompositeAction(
+                        [
+                            SendChatMessageAction(
+                                bot,
+                                lambda event: "Congrats! you got the answer!",
+                                tagsProvider=lambda event: [event.getSourceId()],  # type: ignore[union-attr]
+                            ),
+                            CarryGameToThanksForJoiningAction(questioning, thanksForJoining),
+                        ]
+                    ),
+                ),
+                Transition(
+                    from_=questioning,
+                    trigger=TimeElapsedTrigger(),
+                    to=thanksForJoining,
+                    guard=DurationElapsedGuard(bot, 1, "hour", lambda: questioning.game.startTime),  # type: ignore[union-attr]
+                    action=CarryGameToThanksForJoiningAction(questioning, thanksForJoining),
+                ),
+            ],
+        )
+        knowledgeKingFsm.addTransition(
+            Transition(
+                from_=knowledgeKingFsm,
+                trigger=CommandTrigger("play again"),
+                to=knowledgeKingFsm,
+                guard=QuotaAvailableGuard(bot, 5),
+                action=CompositeAction(
+                    [
+                        DeductQuotaAction(bot, 5),
+                        SendChatMessageAction(bot, lambda event: "KnowledgeKing is gonna start again!"),
+                        CreateKnowledgeKingGameAction(questioning, bot, questions),
+                    ]
+                ),
             )
-        )
+        )  # self-loop：composite 自己轉移到自己，onExit/onEnter 會重新跑，符合「再玩一次」要整個重置的需求
 
-    def _wireKingTransition(self, rootFsm: FiniteStateMachine, states: dict[str, StateNode], bot: Bot) -> None:
-        questioningState = states["questioning"]
-        assert isinstance(questioningState, QuestioningState)
-        questions = self._buildDemoQuestions()
+        rootInitialStateSelector.fallback = normalFsm  # 建構順序限制：rootFsm 早於 normalFsm 存在，事後補上真正的初始子狀態
         rootFsm.addTransition(
             Transition(
-                from_=states["default"],
+                from_=normalFsm,
                 trigger=CommandTrigger("king"),
-                to=questioningState,
+                to=knowledgeKingFsm,
                 guard=AndGuard([AdminOnlyGuard(bot), QuotaAvailableGuard(bot, 5)]),
                 action=CompositeAction(
                     [
                         DeductQuotaAction(bot, 5),
-                        CreateKnowledgeKingGameAction(questioningState, bot, questions),
+                        CreateKnowledgeKingGameAction(questioning, bot, questions),
+                        SendChatMessageAction(bot, lambda event: "KnowledgeKing is started!"),
+                    ]
+                ),
+            )
+        )
+        rootFsm.addTransition(
+            Transition(
+                from_=normalFsm,
+                trigger=CommandTrigger("record"),
+                to=recordFsm,
+                guard=QuotaAvailableGuard(bot, 3),
+                action=CompositeAction([DeductQuotaAction(bot, 3), SetRecorderAction(bot)]),
+            )
+        )
+        rootFsm.addTransition(
+            Transition(
+                from_=recordFsm,
+                trigger=CommandTrigger("stop-recording"),
+                to=normalFsm,
+                guard=IsRecorderGuard(bot),
+                action=ClearRecorderAction(bot),
+            )
+        )
+        rootFsm.addTransition(
+            Transition(
+                from_=knowledgeKingFsm,
+                trigger=CommandTrigger("king-stop"),
+                to=normalFsm,
+                guard=AdminOnlyGuard(bot),
+            )
+        )
+        rootFsm.addTransition(
+            Transition(
+                from_=knowledgeKingFsm,
+                trigger=TimeElapsedTrigger(),
+                to=normalFsm,
+                guard=AndGuard(
+                    [
+                        SubstateActiveGuard(knowledgeKingFsm, thanksForJoining),
+                        DurationElapsedGuard(bot, 20, "second", lambda: thanksForJoining.enteredAt),  # type: ignore[arg-type]
                     ]
                 ),
             )
         )
 
-    def _buildDemoQuestions(self) -> list[Question]:
+        self._wireInternalReactions(bot, default, interacting, recording, questioning, correctAnswerGuard)
+
+        rootFsm.onEnter(None)  # 程式啟動時對根 FSM 呼叫一次，決定初始狀態
+        self.bot = bot
+
+    def _wireInternalReactions(
+        self,
+        bot: Bot,
+        default: DefaultConversationState,
+        interacting: InteractingState,
+        recording: RecordingState,
+        questioning: QuestioningState,
+        correctAnswerGuard: CorrectAnswerGuard,
+    ) -> None:
+        bot.addInternalReaction(
+            InternalReaction(
+                state=default,
+                trigger=MessageFromMemberTrigger(),
+                action=SendChatMessageAction(
+                    bot,
+                    lambda event: default.getNextReplyMessage(),
+                    tagsProvider=lambda event: [event.getSourceId()],  # type: ignore[union-attr]
+                ),
+            )
+        )
+        bot.addInternalReaction(
+            InternalReaction(
+                state=interacting,
+                trigger=MessageFromMemberTrigger(),
+                action=SendChatMessageAction(
+                    bot,
+                    lambda event: interacting.getNextReplyMessage(),
+                    tagsProvider=lambda event: [event.getSourceId()],  # type: ignore[union-attr]
+                ),
+            )
+        )
+        bot.addInternalReaction(
+            InternalReaction(
+                state=default,
+                trigger=PostCreatedTrigger(),
+                action=CommentPostAction(bot, "Nice post", tagsProvider=lambda event: [event.post.authorId]),  # type: ignore[union-attr]
+            )
+        )
+        bot.addInternalReaction(
+            InternalReaction(
+                state=interacting,
+                trigger=PostCreatedTrigger(),
+                action=CommentPostAction(
+                    bot, "How do you guys think about it?", tagsProvider=lambda event: bot.getOnlineParticipantIds()
+                ),
+            )
+        )
+        bot.addInternalReaction(
+            InternalReaction(
+                state=recording,
+                trigger=VoiceSpokenTrigger(),
+                action=AddVoiceToRecordingSessionAction(recording),
+            )
+        )
+        bot.addInternalReaction(
+            InternalReaction(
+                state=questioning,
+                trigger=MentionsBotTrigger(),
+                guard=AndGuard([correctAnswerGuard, NotGuard(GameFinishedGuard(questioning))]),
+                action=CompositeAction(
+                    [
+                        SendChatMessageAction(
+                            bot,
+                            lambda event: "Congrats! you got the answer!",
+                            tagsProvider=lambda event: [event.getSourceId()],  # type: ignore[union-attr]
+                        ),
+                        SendChatMessageAction(bot, lambda event: self._formatQuestion(questioning)),
+                    ]
+                ),
+            )
+        )
+
+    def _formatQuestion(self, questioning: QuestioningState) -> str:
+        assert questioning.game is not None
+        question = questioning.game.getCurrentQuestion()
+        return f"{question.number}. {question.description}"
+
+    def _buildQuestions(self) -> list[Question]:
         return [
-            Question(1, "TODO: 題目 1", ["A", "B", "C"], "A"),
-            Question(2, "TODO: 題目 2", ["A", "B", "C"], "B"),
-            Question(3, "TODO: 題目 3", ["A", "B", "C"], "C"),
+            Question(
+                0,
+                "請問哪個 SQL 語句用於選擇所有的行？(A) SELECT * (B) SELECT ALL (C) SELECT ROWS (D) SELECT DATA",
+                ["A", "B", "C", "D"],
+                "A",
+            ),
+            Question(
+                1,
+                "請問哪個 CSS 屬性可用於設置文字的顏色？(A) text-align (B) font-size (C) color (D) padding",
+                ["A", "B", "C", "D"],
+                "C",
+            ),
+            Question(
+                2,
+                "請問在計算機科學中，「XML」代表什麼？(A) Extensible Markup Language (B) Extensible Modeling Language "
+                "(C) Extended Markup Language (D) Extended Modeling Language",
+                ["A", "B", "C", "D"],
+                "A",
+            ),
         ]
