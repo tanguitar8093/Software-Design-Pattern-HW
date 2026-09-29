@@ -1,4 +1,7 @@
-from ..community.community import WaterCommunity
+from datetime import datetime as DateTime
+from typing import Optional
+
+from ..community.community import Participant, WaterCommunity
 from ..events.domain_events import DomainEvent
 from ..events.publisher import CommunityObserver
 from ..fsm.core import FiniteStateMachine
@@ -34,3 +37,15 @@ class Bot(CommunityObserver):
 
     def broadcastVoice(self, content: str) -> None:
         self._community.postBotVoice(content)
+
+    def getOnlineCount(self) -> int:
+        return self._community.getOnlineCount()
+
+    def isBroadcasting(self) -> bool:
+        return self._community.isBroadcasting()
+
+    def getParticipant(self, participantId: str) -> Optional[Participant]:
+        return self._community.getParticipant(participantId)
+
+    def getCurrentTime(self) -> DateTime:
+        return self._community.currentTime

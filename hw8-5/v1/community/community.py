@@ -2,6 +2,7 @@ from abc import ABC
 from datetime import datetime as DateTime
 from datetime import timedelta
 from enum import Enum
+from typing import Optional
 from uuid import uuid4
 
 from .channels import Broadcast, ChatRoom, Comment, Forum, Message, Post, VoiceMessage
@@ -22,7 +23,7 @@ class Participant(ABC):
 
 
 class Member(Participant):
-    def __init__(self, id: str, role: int):
+    def __init__(self, id: str, role: Role):
         super().__init__(id)
         self.role = role
 
@@ -56,7 +57,7 @@ class WaterCommunity:
 
     def login(self, participant: Participant) -> None:
         self._onlineParticipants[participant.id] = participant
-        isAdmin = isinstance(participant, Member) and participant.role == 1  # role 慣例：1 = ADMIN，待確認
+        isAdmin = isinstance(participant, Member) and participant.role == Role.ADMIN
         self._eventPublisher.notify(LoginEvent(participant.id, isAdmin))
 
     def logout(self, participantId: str) -> None:
@@ -73,6 +74,12 @@ class WaterCommunity:
 
     def getOnlineCount(self) -> int:
         return len(self._onlineParticipants)
+
+    def getParticipant(self, participantId: str) -> Optional[Participant]:
+        return self._onlineParticipants.get(participantId)
+
+    def isBroadcasting(self) -> bool:
+        return self._broadcast.isBroadcasting()
 
     def getEventPublisher(self) -> EventPublisher:
         return self._eventPublisher
