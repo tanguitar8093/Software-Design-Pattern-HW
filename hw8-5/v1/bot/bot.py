@@ -18,6 +18,7 @@ class Bot(CommunityObserver):
         self.description = description
         self.rootFsm = rootFsm
         self._community = community  # 全委派型：Bot 不持有 ChatRoom/Forum/Broadcast，一律透過 WaterCommunity 代理
+        community.getEventPublisher().register(self)
 
     def getId(self) -> str:
         return self.id
