@@ -1,8 +1,8 @@
 from ..activities.knowledge_king import Question
 from ..community.community import WaterCommunity
-from ..fsm.core import Action, Event, FiniteStateMachine, Transition
+from ..fsm.core import FiniteStateMachine, Transition
 from ..fsm.initial_state_selector import GuardedInitialStateSelector
-from .actions.composite import CompositeAction
+from .actions.composite import CompositeAction, NoopAction
 from .actions.concrete import (
     AddVoiceToRecordingSessionAction,
     AnnounceGameResultAction,
@@ -53,18 +53,11 @@ from .triggers.triggers import (
 )
 
 
-class _NoopAction(Action):
-    """佔位用：部分狀態沒有額外的 entry/exit 行為，先用不做事的 Action 卡位。"""
-
-    def execute(self, event: Event) -> None:
-        pass
-
-
 class BotFacade:
     """對外唯一入口：把「組一堆 State/Guard/Action/Trigger/Transition 才能生出 Bot」的複雜度包起來。"""
 
     def __init__(self, community: WaterCommunity, quota: int = 20, description: str = "Waterball 知識王機器人"):
-        noop = _NoopAction()
+        noop = NoopAction()
         default = DefaultConversationState(noop, noop, messages=["good to hear", "thank you", "How are you"])
         interacting = InteractingState(noop, noop, messages=["Hi hi😁", "I like your idea!"])
         waiting = WaitingState(noop, noop)

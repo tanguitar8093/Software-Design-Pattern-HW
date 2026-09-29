@@ -12,6 +12,10 @@
 
 [oodv4-6-botfacade.mmd](oodv4-6-botfacade.mmd) 新增 `BotFacade`、`InternalReaction` 兩個類別，新增 N40～N42。
 
+[oodv4-7-botfacade-runtime.mmd](oodv4-7-botfacade-runtime.mmd) 把 `BotFacade` 從示範版補完成組裝完整版（五個指令 +
+三個複合 FSM + 六條 `InternalReaction`），並修正 `IsRecorderGuard`/`CreateRecordingSessionAction`/`Bot.getOnlineCount()`/
+`Bot.onEvent()` 幾個原本設計有誤的地方，新增 N43～N57，詳見 [oodv4-7-botfacade-runtime-diff.md](oodv4-7-botfacade-runtime-diff.md)。
+
 ## N1 — Participant
 
 代表社群中活生生的人，是所有社群社交、內容創作、語音交流以及參與操作的憑證持有者。
@@ -301,3 +305,123 @@ Bot」這整套複雜度包起來，App 層以後只需要 `BotFacade(community)
 只重用 FSM 模組既有的 `Trigger`/`Action` 介面，表達「目前 leaf state 是這個、且這個事件命中
 trigger，就執行這個 action，但不換狀態」。刻意放在 Bot 模組（不放進 `fsm/`），因為它認識「leaf
 state」這種只有 Bot 業務語意才有意義的概念，FSM 核心本身不能知道這件事存在。
+
+## N43 — MessageFromMemberTrigger
+
+- **對應**：`Default`/`Interacting` 訊息輪播，**取代原本誤用的 `MentionsBotTrigger`**。README 範例（如
+  「大家早安」沒有標記 bot）顯示訊息輪播不要求標記 bot，只要不是機器人自己發的訊息就算數，避免機器人
+  回覆自己的訊息造成無限遞迴。
+- **判斷邏輯**：`isinstance(event, MessagePostedEvent)` 且 `message.authorId != BOT_ID`。
+
+## N44 — PostCreatedTrigger / VoiceSpokenTrigger
+
+- **對應**：`PostCreatedTrigger` 給 `Default`/`Interacting` 論壇留言兩條 `InternalReaction`；
+  `VoiceSpokenTrigger` 給 `Recording` 累積語音的 `InternalReaction`。
+- **判斷邏輯**：純粹型別比對，不看內容細節。
+
+## N45 — FiniteStateMachine 巢狀組裝（Normal/Record/KnowledgeKing）
+
+`Normal`（`Default⇄Interacting`）、`Record`（`Waiting⇄Recording`）、`KnowledgeKing`
+（`Questioning⇄ThanksForJoining`）三個複合狀態，實際上是三個各自獨立的 `FiniteStateMachine` **實例**，
+各自持有自己的 `GuardedInitialStateSelector` 跟內部 `Transition[*]`，再被當成一般 `StateNode` 塞進
+`rootFsm.transitions` 的 `from_`/`to`。這是「同一顆類別在執行期巢狀組裝」的事實，class diagram 畫不出
+「三個實例」，只能靠 N49（`BotFacade`）跟程式碼／循序圖對照理解。
+
+`play again` 是 `knowledgeKingFsm` 對自己的 self-loop `Transition`（`from_=to=knowledgeKingFsm`），刻意
+不避開 self-loop：因為「再玩一次」就是要整個複合狀態重新 `onEnter`（重新選一次初始子狀態、重置一切），
+跟 N9 提到的「單一 leaf state 自我轉移會誤觸發重置」是不同情境——這裡本來就要重置。
+
+## N46 — InternalReaction 的可選 guard
+
+`InternalReaction` 補上跟 `Transition` 對稱的可選 `guard` 欄位：`isApplicable()` 除了比對
+`activeLeafState`/`trigger`，若有掛 `guard` 還要 `guard.isSatisfied(event)` 為真才算命中。用來表達
+「答對但題目還沒出完」這種「trigger 命中但還需要額外條件」的原地反應（`Questioning` 答對進下一題，
+搭配 `CorrectAnswerGuard` + `NotGuard(GameFinishedGuard)`，且刻意跟對應 `Transition` 共用同一個
+`CorrectAnswerGuard` 實例，維持 N20 提到的冪等快取只算一次分數）。
+
+## N47 — Bot.getOnlineParticipantIds()
+
+回傳 `["bot"] + 依登入順序排列的成員 id`，供 `Interacting` 狀態論壇留言標記全體在線成員（機器人排最前，
+其餘依登入順序）用，直接重用 `WaterCommunity.getOnlineParticipants()` 既有回傳順序（dict 插入順序＝登入
+順序），不需要額外排序邏輯。
+
+## N48 — Bot.getOnlineCount() / Bot.onEvent() 順序修正
+
+`getOnlineCount()` 改成 `WaterCommunity.getOnlineCount() + 1`：README 明定在線人數計算要包含機器人自己，
+原本沒加會導致 `Interacting` 少算 1 人才觸發（需要 10 個成員才切換，應該是 9 個成員 + 機器人自己）。
+
+`onEvent(event)` 執行順序改成：先用**轉移前**的 leaf state 逐一比對 `internalReactions[*]` 並執行命中的
+`Action`，再呼叫 `rootFsm.fire(event)`。對應 README「先依據當前狀態處理該訊息（如：回覆輪播訊息），之後
+再執行指令（切換狀態）」的明文順序（原本寫反了，先切換狀態才跑原地反應）。
+
+## N49 — BotFacade（組裝完整版）
+
+從只示範 `king` 指令，補完到五個指令（`king`/`record`/`stop-recording`/`king-stop`/`play again`）、三個
+複合 `FiniteStateMachine`（見 N45）、六條 `InternalReaction`（見 N46）全部組裝完成，並已用互動模擬驗證
+整條流程符合 README 規格（quota 扣除、輪播、留言、錄音累積/回放、答題計分、公布贏家、20 秒回 Normal）。
+
+## N50 — SubstateActiveGuard(fsm, expected)
+
+- **對應**：`ThanksForJoining → Normal`（20 秒後）這條轉移掛在 `knowledgeKingFsm`（複合狀態整體）上，但
+  只有目前子狀態剛好是 `ThanksForJoiningState` 才該觸發（`Questioning` 子狀態不該被這條命中，否則答題
+  途中的計時事件會誤觸發跳出整個 KnowledgeKing）。
+- **判斷邏輯**：`fsm.currentState is expected`。
+- **通用性**：完全不認識任何 Waterball 業務名詞，屬於「跨子狀態的最外層轉移」這種通用場景都能重用的組件，
+  分類上跟 `AndGuard`/`NotGuard` 同一類。
+
+## N51 — NoopAction
+
+Null Object：給不需要 entry/exit 行為的狀態卡位用（FSM 模組的 `State.__init__` 強制要求 `enter`/`exit`
+都要是 `Action`，不接受 `None`）。原本是 `BotFacade` 裡的私有類別 `_NoopAction`，確認它不認識任何業務
+語意後，依既有分類原則（通用組合器跟業務具體類別分開放）搬到跟 `CompositeAction` 同一個位置，變成公開、
+可在任何需要 `Action` 佔位的地方重用的元件。
+
+## N52 — IsRecorderGuard / CreateRecordingSessionAction 依賴修正
+
+**原本**：`IsRecorderGuard` 依賴 `RecordingSession.recorderId`（見舊版 N22），`CreateRecordingSessionAction`
+依賴事件本身的 `getSourceId()`（當次廣播者 id）。
+
+**問題**：README 範例裡 recorder（下 `record` 指令的人）可以不是廣播者，且身分要橫跨多輪 Waiting⇄Recording
+循環維持不變直到 `stop-recording`；`session` 卻是每次進 `Recording` 子狀態才重新建立。舊寫法會標記錯人、
+判斷錯誰能下 `stop-recording`，且在 `Waiting` 子狀態（`session is None`）呼叫 `stop-recording` 會直接
+噴例外。
+
+**修正**：兩者改依賴新增的 `Bot.recorderId` 欄位（見 N53），跟「廣播者是誰」「現在有沒有 session」完全
+無關。
+
+## N53 — SetRecorderAction / ClearRecorderAction
+
+- **對應**：`SetRecorderAction` 掛在 `record` 指令的 `Transition.action` 上，記下「誰下的指令，誰就是接
+  下來這整段錄音狀態期間的錄音者」；`ClearRecorderAction` 掛在 `stop-recording` 的 `Transition.action`
+  上，錄音結束後清空。
+- **依賴**：`Bot.recorderId`
+
+## N54 — AddVoiceToRecordingSessionAction
+
+- **對應**：`Recording` 狀態的 `VoiceSpokenTrigger` `InternalReaction`，每收到一筆語音訊息就累積進目前
+  的 `RecordingSession`。跟 `CreateRecordingSessionAction`（進場才建立一次）職責不同：一個負責「建立」、
+  一個負責「持續累積」。
+- **依賴**：`RecordingSession.addVoice()`
+
+## N55 — CarryGameToThanksForJoiningAction
+
+- **對應**：`Questioning → ThanksForJoining`（答完/超時）兩條轉移共用，把 `KnowledgeKingGame` 參照從
+  `QuestioningState` 搬到 `ThanksForJoiningState`，讓 `ThanksForJoiningState` 進場公布結果時能讀到同一
+  份遊戲紀錄。
+- **依賴**：`QuestioningState.game`、`ThanksForJoiningState.game`
+
+## N56 — AnnounceGameResultAction
+
+- **對應**：`ThanksForJoiningState` 的進場行為（`enter`）。判斷此刻有沒有人在廣播：沒有就用語音公布
+  結果、否則改用聊天訊息；同時把進場時間記在 `ThanksForJoiningState.enteredAt`，供搭配
+  `SubstateActiveGuard` + `DurationElapsedGuard` 判斷「20 秒後回 Normal」用。
+- **依賴**：`KnowledgeKingGame.getWinner()`、`Bot.isBroadcasting()`/`replyChatMessage()`/`broadcastVoice()`/
+  `getCurrentTime()`
+
+## N57 — ResetReplyCycleAction
+
+- **對應**：`DefaultConversationState`/`InteractingState` 的進場行為（`enter`）。README 明定「機器人每次
+  重新返回該狀態時，會從第一則訊息開始回覆」，但這兩個 State 是單一持久物件，`replyCycleIndex` 不會自動
+  歸零，需要一個進場動作顯式重置。
+- **依賴**：`DefaultConversationState.replyCycleIndex` 或 `InteractingState.replyCycleIndex`（同一顆類別，
+  duck-typing 共用）

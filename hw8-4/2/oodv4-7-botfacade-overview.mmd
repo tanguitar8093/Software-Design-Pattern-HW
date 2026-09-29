@@ -1,0 +1,142 @@
+classDiagram
+    direction LR
+
+    %% ======================= 重點簡化版：只畫「大類別/介面」，具體子類別一律用便條紙帶過 =======================
+    %% 完整版（含所有具體子類別與細節依賴）見 oodv4-7-botfacade-runtime.mmd + oodv4-4-notes.md（N1~N57）
+    %% 這張圖的關聯線只在「大類別之間」，不會有任何一條線連到具體子類別
+
+    %% ======================= 社群基礎設施 =======================
+    class WaterCommunity {
+        +login/logout/elapseTime()
+        +getOnlineParticipants()/getOnlineCount()
+        +postBotReply/postBotComment/postBotVoice()
+    }
+    class Participant {
+        <<abstract>>
+    }
+    class ChatRoom
+    class Forum
+    class Broadcast
+
+    note for Participant "唯一子類別：Member（管理員/一般成員，靠 Role enum 區分）"
+
+    WaterCommunity "1" o-- "0..*" Participant : 線上參與者
+    WaterCommunity "1" *-- "1" ChatRoom
+    WaterCommunity "1" *-- "1" Forum
+    WaterCommunity "1" *-- "1" Broadcast
+    WaterCommunity "1" *-- "1" EventPublisher
+
+    %% ======================= 事件系統 =======================
+    class EventPublisher {
+        +register/unregister(observer) void
+        +notify(event: DomainEvent) void
+    }
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+    class CommunityObserver {
+        <<interface>>
+        +onEvent(event: DomainEvent) void
+    }
+
+    note for DomainEvent "9 個具體事件：MessagePostedEvent/PostCreatedEvent/CommentAddedEvent/\nBroadcastStartedEvent/BroadcastStoppedEvent/VoiceSpokenEvent/\nLoginEvent/LogoutEvent/TimeElapsedEvent"
+
+    ChatRoom ..> EventPublisher : notify
+    Forum ..> EventPublisher : notify
+    Broadcast ..> EventPublisher : notify
+    WaterCommunity ..> EventPublisher : notify
+    EventPublisher "1" o-- "0..*" CommunityObserver : observers
+    EventPublisher ..> DomainEvent : notify(event)
+    CommunityObserver <|.. Bot
+
+    %% ======================= FSM 模組（地基，完整定義見 fsm-ooa-4.mmd） =======================
+    class Trigger {
+        <<interface>>
+        +isTriggeredBy(event) bool
+    }
+    class Guard {
+        <<interface>>
+        +isSatisfied(event) bool
+    }
+    class Action {
+        <<interface>>
+        +execute(event) void
+    }
+    class StateNode {
+        <<interface>>
+        +onEnter/onExit(event) void
+        +fire(event) bool
+    }
+    class FiniteStateMachine {
+        +addTransition(transition) void
+        +fire(event) bool
+    }
+    class Transition {
+        +isApplicable(currentState, event) bool
+    }
+    class InitialStateSelector {
+        <<interface>>
+        +select(event) StateNode
+    }
+
+    note for Trigger "10 個具體 Trigger：CommandTrigger/MentionsBotTrigger/MessageFromMemberTrigger/\nPostCreatedTrigger/VoiceSpokenTrigger/LoginTrigger/LogoutTrigger/\nBroadcastStartedTrigger/BroadcastStoppedTrigger/TimeElapsedTrigger"
+    note for Guard "通用組合器：AndGuard/NotGuard/SubstateActiveGuard\nBot 專用具體 Guard（8）：OnlineCountAtLeastGuard/IsBroadcastingGuard/AdminOnlyGuard/\nQuotaAvailableGuard/CorrectAnswerGuard/GameFinishedGuard/IsRecorderGuard/DurationElapsedGuard"
+    note for Action "通用組合器：CompositeAction/NoopAction\nBot 專用具體 Action（12）：CommentPostAction/FlushRecordReplayAction/DeductQuotaAction/\nSetRecorderAction/ClearRecorderAction/CreateRecordingSessionAction/\nAddVoiceToRecordingSessionAction/CreateKnowledgeKingGameAction/\nCarryGameToThanksForJoiningAction/AnnounceGameResultAction/\nResetReplyCycleAction/SendChatMessageAction"
+    note for StateNode "實作類別：State（6 個具體子類別：DefaultConversationState/InteractingState/\nWaitingState/RecordingState/QuestioningState/ThanksForJoiningState）\n以及 FiniteStateMachine 本身（可巢狀當子狀態機）"
+    note for InitialStateSelector "具體子類別：GuardedInitialStateSelector"
+
+    StateNode <|.. FiniteStateMachine : 可巢狀（子狀態機）
+    FiniteStateMachine "1" --> "1" InitialStateSelector
+    FiniteStateMachine "1" o-- "0..*" Transition
+    Transition ..> Trigger
+    Transition ..> Guard
+    Transition ..> Action
+    Transition --> StateNode : from/to
+    Guard ..> Bot : 多數具體 Guard 依賴 Bot 唯讀方法
+    Action ..> Bot : 多數具體 Action 依賴 Bot 唯讀方法
+    Trigger ..> DomainEvent : 型別/內容比對
+
+    %% ======================= 原地反應 =======================
+    class InternalReaction {
+        +isApplicable(activeLeafState, event) bool
+    }
+
+    InternalReaction ..> StateNode
+    InternalReaction ..> Trigger
+    InternalReaction ..> Guard : 可選
+    InternalReaction ..> Action
+
+    %% ======================= Bot 主體與領域物件 =======================
+    class Bot {
+        +onEvent(event) void
+        +replyChatMessage/commentPost/broadcastVoice()
+        +getOnlineCount/isBroadcasting/getParticipant()
+        +addInternalReaction(reaction) void
+    }
+    class BotFacade {
+        -bot: Bot
+    }
+    class KnowledgeKingGame {
+        +submitAnswer/isFinished/getWinner()
+    }
+    class RecordingSession {
+        +addVoice/generateReplay()
+    }
+
+    Bot "1" --> "1" FiniteStateMachine : rootFsm
+    Bot "1" o-- "0..*" InternalReaction
+    Bot ..> WaterCommunity : 全委派型（不持有 ChatRoom/Forum/Broadcast）
+    Bot ..> StateNode : 沿 currentState 鏈找目前 leaf state
+    StateNode o-- "0..1" RecordingSession : Recording 子類別持有
+    StateNode o-- "0..1" KnowledgeKingGame : Questioning/ThanksForJoining 子類別持有
+
+    BotFacade "1" --> "1" Bot
+    BotFacade ..> WaterCommunity : 建構 Bot
+    BotFacade ..> StateNode : 組裝具體狀態
+    BotFacade ..> FiniteStateMachine : 組裝 Normal/Record/KnowledgeKing 三個複合子 FSM
+    BotFacade ..> Transition : 組裝
+    BotFacade ..> InternalReaction : 組裝
+    BotFacade ..> Guard : 組裝具體 Guard
+    BotFacade ..> Action : 組裝具體 Action
+    BotFacade ..> Trigger : 組裝具體 Trigger
