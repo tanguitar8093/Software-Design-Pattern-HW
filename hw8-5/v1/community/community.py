@@ -84,6 +84,25 @@ class WaterCommunity:
     def getEventPublisher(self) -> EventPublisher:
         return self._eventPublisher
 
+    def postMessage(self, authorId: str, content: str, tags: list[str]) -> None:
+        """App 層專用：以成員身份發訊息，不需要拿到 ChatRoom 實例。"""
+        self._chatRoom.postMessage(Message(authorId, content, tags))
+
+    def createPost(self, id: str, authorId: str, title: str, content: str, tags: list[str]) -> None:
+        self._forum.createPost(Post(id, authorId, title, content, tags))
+
+    def addComment(self, postId: str, authorId: str, content: str, tags: list[str]) -> None:
+        self._forum.addComment(postId, Comment(authorId, content, tags))
+
+    def startBroadcast(self, speakerId: str) -> None:
+        self._broadcast.start(speakerId)
+
+    def speak(self, speakerId: str, content: str) -> None:
+        self._broadcast.speak(VoiceMessage(speakerId, content))
+
+    def stopBroadcast(self, speakerId: str) -> None:
+        self._broadcast.stop(speakerId)
+
     def postBotReply(self, content: str, tags: list[str]) -> None:
         self._chatRoom.postMessage(Message(BOT_ID, content, tags))
 

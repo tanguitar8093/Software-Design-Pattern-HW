@@ -56,7 +56,7 @@ class Forum:
         from ..events.domain_events import CommentAddedEvent
 
         self._posts[postId].addComment(comment)
-        self._eventPublisher.notify(CommentAddedEvent(comment))
+        self._eventPublisher.notify(CommentAddedEvent(postId, comment))
 
     def getPost(self, id: str) -> Post:
         return self._posts[id]

@@ -28,7 +28,8 @@ class PostCreatedEvent(DomainEvent):
 
 
 class CommentAddedEvent(DomainEvent):
-    def __init__(self, comment: Comment):
+    def __init__(self, postId: str, comment: Comment):
+        self.postId = postId
         self.comment = comment
 
     def getSourceId(self) -> Optional[str]:
