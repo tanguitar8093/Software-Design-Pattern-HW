@@ -1,4 +1,4 @@
-from ..events.domain_events import (
+from ...events.domain_events import (
     BroadcastStartedEvent,
     BroadcastStoppedEvent,
     LoginEvent,
@@ -6,7 +6,7 @@ from ..events.domain_events import (
     MessagePostedEvent,
     TimeElapsedEvent,
 )
-from ..fsm.core import Event, Trigger
+from ...fsm.core import Event, Trigger
 
 BOT_TAG = "bot"  # Message.tags 標記機器人的統一慣例字串
 

@@ -1,5 +1,5 @@
-from ..domain.knowledge_king import KnowledgeKingGame
-from ..domain.recording import RecordingSession
+from ..activities.knowledge_king import KnowledgeKingGame
+from ..activities.recording import RecordingSession
 from ..fsm.core import Action, State
 
 

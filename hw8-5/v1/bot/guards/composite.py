@@ -1,4 +1,4 @@
-from ..fsm.core import Action, Event, Guard
+from ...fsm.core import Event, Guard
 
 
 class AndGuard(Guard):
@@ -15,12 +15,3 @@ class NotGuard(Guard):
 
     def isSatisfied(self, event: Event) -> bool:
         return not self.guard.isSatisfied(event)
-
-
-class CompositeAction(Action):
-    def __init__(self, actions: list[Action]):
-        self.actions = actions
-
-    def execute(self, event: Event) -> None:
-        for action in self.actions:
-            action.execute(event)

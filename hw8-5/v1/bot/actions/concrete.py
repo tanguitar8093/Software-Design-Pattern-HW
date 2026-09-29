@@ -1,6 +1,6 @@
 from typing import Callable
 
-from ..fsm.core import Action, Event
+from ...fsm.core import Action, Event
 
 
 class CommentPostAction(Action):
