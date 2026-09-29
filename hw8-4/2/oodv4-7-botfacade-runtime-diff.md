@@ -82,3 +82,13 @@ README 規格。過程中發現並修正了幾個原本設計/實作有誤的地
 巢狀」這件事，只能靠這條依賴線 + 文字說明帶過，詳見 N49）。
 
 新增 N43～N57，見 [oodv4-4-notes.md](oodv4-4-notes.md)。
+
+### 10. `WaterCommunity` 類別方塊補齊方法、`Bot` 對外部依賴線修正（跟現有程式碼校對後補上的遺漏）
+
+`WaterCommunity` 類別方塊原本漏列 `getParticipant()`、`isBroadcasting()`、`postBotComment()`、
+`postBotVoice()` 四個方法（圖上其他地方的依賴線其實已經在用，只是類別方塊本身沒畫出來）。
+
+`Bot` 是全委派型（不持有 `ChatRoom`/`Forum`/`Broadcast` 參照），原圖卻畫了 `Bot ..> Forum : commentPost()`
+和 `Bot ..> Broadcast : broadcastVoice()` 兩條直接依賴線，跟實作不符，已改成透過 `WaterCommunity` 委派
+（`postBotComment()`/`postBotVoice()`，詳見 N39）。連帶修正 `CommentPostAction ..> Forum : addComment()`
+為 `CommentPostAction ..> Bot : commentPost()`（`CommentPostAction` 實際上只認識 `Bot`）。

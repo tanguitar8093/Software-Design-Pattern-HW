@@ -266,16 +266,18 @@ Record 各自開一個具體 Selector 子類別，而是拿一串 `(Guard, State
 （`Forum`/`Broadcast`/`WaterCommunity` 等），皆由 `Bot` 建構子在組裝 `Transition` 當下一併傳入建構子參數，
 本圖不畫這條供應鏈，屬於建構時序範疇。
 
-## N39 — Bot.replyChatMessage / WaterCommunity.postBotReply 委派鏈
+## N39 — Bot.replyChatMessage/commentPost/broadcastVoice / WaterCommunity 委派鏈
 
-`SendChatMessageAction.execute()` 呼叫 `Bot.replyChatMessage(content, tags)`；`Bot` 自己沒有 `ChatRoom` 的
-參照，因此內部直接委派呼叫 `WaterCommunity.postBotReply(content, tags)`。
+`Bot` 是全委派型：不持有 `ChatRoom`/`Forum`/`Broadcast` 的參照，`replyChatMessage()`、`commentPost()`、
+`broadcastVoice()` 三個方法各自原樣轉呼叫 `WaterCommunity.postBotReply()`、`postBotComment()`、
+`postBotVoice()`。
 
-`WaterCommunity.postBotReply(content, tags)` 才是真正知道 `ChatRoom` 存在的一層：內部組裝
-`Message(authorId="bot", content, tags)`，再呼叫自己持有的 `chatRoom.postMessage(message)`。
+`WaterCommunity` 這三個 `postBot*` 方法才是真正知道 `ChatRoom`/`Forum`/`Broadcast` 存在的一層：各自組裝
+對應的 `Message`/`Comment`/`VoiceMessage`（`authorId`/`speakerId` 固定填 `"bot"`），再呼叫自己持有的
+`chatRoom.postMessage()`/`forum.addComment()`/`broadcast.speak()`。
 
-兩個方法簽名相同（`content: str, tags: list<str>`）但職責不同：`Bot` 那層決定「要回什麼內容」，
-`WaterCommunity` 那層決定「怎麼把內容真的送進聊天室」。
+每一組方法簽名相同但職責不同：`Bot` 那層決定「要回什麼內容」，`WaterCommunity` 那層決定「怎麼把內容真的
+送進聊天室/論壇/廣播」。
 
 ## N40 — Bot.internalReactions / addInternalReaction / 找 leaf state
 

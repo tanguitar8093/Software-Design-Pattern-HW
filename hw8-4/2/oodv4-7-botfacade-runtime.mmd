@@ -28,8 +28,12 @@ classDiagram
         +elapseTime(amount: int, unit: str) void
         +getOnlineParticipants() list~Participant~
         +getOnlineCount() int
+        +getParticipant(participantId: str) Participant
+        +isBroadcasting() bool
         +getEventPublisher() EventPublisher
         +postBotReply(content: str, tags: list~str~) void
+        +postBotComment(postId: str, content: str, tags: list~str~) void
+        +postBotVoice(content: str) void
     }
 
     class Participant {
@@ -375,13 +379,13 @@ classDiagram
     Bot "1" --> "1" FiniteStateMachine : rootFsm
     Bot "1" o-- "0..*" InternalReaction : internalReactions
     Bot ..> StateNode : 沿 currentState 鏈走到底找目前 leaf state
-    Bot ..> Forum : commentPost()
-    Bot ..> Broadcast : broadcastVoice()
     Bot ..> WaterCommunity : getEventPublisher()
-    Bot ..> WaterCommunity : postBotReply()
+    Bot ..> WaterCommunity : postBotReply()/postBotComment()/postBotVoice()
     Bot ..> WaterCommunity : getOnlineCount()/isBroadcasting()/getParticipant()/currentTime/getOnlineParticipants()
     Bot --> EventPublisher : register(this)
     WaterCommunity ..> ChatRoom : postMessage()
+    WaterCommunity ..> Forum : addComment()
+    WaterCommunity ..> Broadcast : speak()
 
     note for Bot "N10"
     note for Bot "N37"
@@ -636,7 +640,7 @@ classDiagram
     Action <|.. ResetReplyCycleAction
     Action <|.. SendChatMessageAction
 
-    CommentPostAction ..> Forum : addComment()
+    CommentPostAction ..> Bot : commentPost()
     FlushRecordReplayAction ..> RecordingSession : generateReplay()
     FlushRecordReplayAction ..> Bot : replyChatMessage()/recorderId
     DeductQuotaAction ..> Bot : quota
