@@ -16,16 +16,17 @@ from .actions.concrete import (
     ResetReplyCycleAction,
     SendChatMessageAction,
     SetRecorderAction,
+    SubmitAnswerAction,
 )
 from .bot import Bot
 from .guards.composite import AndGuard, NotGuard
 from .guards.concrete import (
     AdminOnlyGuard,
-    CorrectAnswerGuard,
+    AnswerCorrectGuard,
     DurationElapsedGuard,
-    GameFinishedGuard,
     IsBroadcastingGuard,
     IsRecorderGuard,
+    LastQuestionGuard,
     OnlineCountAtLeastGuard,
     QuotaAvailableGuard,
     SubstateActiveGuard,
@@ -99,7 +100,8 @@ class BotFacade:
             ],
         )
         questions = self._buildQuestions()
-        correctAnswerGuard = CorrectAnswerGuard(questioning)
+        answerCorrectGuard = AnswerCorrectGuard(questioning)
+        lastQuestionGuard = LastQuestionGuard(questioning)
         knowledgeKingFsm = FiniteStateMachine(
             currentState=None,
             initialStateSelector=GuardedInitialStateSelector([], questioning),
@@ -108,9 +110,10 @@ class BotFacade:
                     from_=questioning,
                     trigger=MentionsBotTrigger(),
                     to=thanksForJoining,
-                    guard=AndGuard([correctAnswerGuard, GameFinishedGuard(questioning)]),
+                    guard=AndGuard([answerCorrectGuard, lastQuestionGuard]),
                     action=CompositeAction(
                         [
+                            SubmitAnswerAction(questioning),
                             SendChatMessageAction(
                                 bot,
                                 lambda event: "Congrats! you got the answer!",
@@ -201,7 +204,7 @@ class BotFacade:
             )
         )
 
-        self._wireInternalReactions(bot, default, interacting, recording, questioning, correctAnswerGuard)
+        self._wireInternalReactions(bot, default, interacting, recording, questioning, answerCorrectGuard, lastQuestionGuard)
 
         rootFsm.onEnter(None)  # 程式啟動時對根 FSM 呼叫一次，決定初始狀態
         self.bot = bot
@@ -213,7 +216,8 @@ class BotFacade:
         interacting: InteractingState,
         recording: RecordingState,
         questioning: QuestioningState,
-        correctAnswerGuard: CorrectAnswerGuard,
+        answerCorrectGuard: AnswerCorrectGuard,
+        lastQuestionGuard: LastQuestionGuard,
     ) -> None:
         bot.addInternalReaction(
             InternalReaction(
@@ -264,9 +268,10 @@ class BotFacade:
             InternalReaction(
                 state=questioning,
                 trigger=MentionsBotTrigger(),
-                guard=AndGuard([correctAnswerGuard, NotGuard(GameFinishedGuard(questioning))]),
+                guard=AndGuard([answerCorrectGuard, NotGuard(lastQuestionGuard)]),
                 action=CompositeAction(
                     [
+                        SubmitAnswerAction(questioning),
                         SendChatMessageAction(
                             bot,
                             lambda event: "Congrats! you got the answer!",

@@ -1,6 +1,6 @@
 from datetime import datetime as DateTime
 from datetime import timedelta
-from typing import Callable, Optional
+from typing import Callable
 
 from ...community.community import Member, Role
 from ...events.domain_events import DomainEvent, MessagePostedEvent
@@ -46,28 +46,27 @@ class QuotaAvailableGuard(Guard):
         return self.bot.quota >= self.cost
 
 
-class CorrectAnswerGuard(Guard):
+class AnswerCorrectGuard(Guard):
+    """純查詢：只判斷答案對不對，不呼叫 submitAnswer()，計分交給 Action 做（N20）。"""
+
     def __init__(self, questioningState: QuestioningState):
         self.questioningState = questioningState
-        self._lastEvent: Optional[Event] = None
-        self._lastResult: bool = False
 
     def isSatisfied(self, event: Event) -> bool:
         if not isinstance(event, MessagePostedEvent):
             return False
-        if event is self._lastEvent:  # 同一次 fire() 裡被別條 Transition 重複問，避免重複計分（N20）
-            return self._lastResult
-        self._lastEvent = event
-        self._lastResult = self.questioningState.game.submitAnswer(event.getSourceId(), event.message.content)
-        return self._lastResult
+        return self.questioningState.game.getCurrentQuestion().isCorrect(event.message.content)  # type: ignore[union-attr]
 
 
-class GameFinishedGuard(Guard):
+class LastQuestionGuard(Guard):
+    """提交前就能純查詢「這是不是最後一題」，取代提交後才成立的 isFinished()。"""
+
     def __init__(self, questioningState: QuestioningState):
         self.questioningState = questioningState
 
     def isSatisfied(self, event: Event) -> bool:
-        return self.questioningState.game.isFinished()
+        game = self.questioningState.game
+        return game.currentQuestionIndex == len(game.questions) - 1  # type: ignore[union-attr]
 
 
 class IsRecorderGuard(Guard):

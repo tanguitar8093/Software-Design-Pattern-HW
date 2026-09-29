@@ -3,7 +3,7 @@ from typing import Callable
 from ...activities.knowledge_king import KnowledgeKingGame, Question
 from ...activities.recording import RecordingSession
 from ...community.channels import VoiceMessage
-from ...events.domain_events import DomainEvent, PostCreatedEvent, VoiceSpokenEvent
+from ...events.domain_events import DomainEvent, MessagePostedEvent, PostCreatedEvent, VoiceSpokenEvent
 from ...fsm.core import Action, Event
 from ..bot import Bot
 from ..states import DefaultConversationState, InteractingState, QuestioningState, RecordingState, ThanksForJoiningState
@@ -99,6 +99,18 @@ class CreateKnowledgeKingGameAction(Action):
 
     def execute(self, event: Event) -> None:
         self.questioningState.game = KnowledgeKingGame(list(self.questions), self.bot.getCurrentTime())
+
+
+class SubmitAnswerAction(Action):
+    """Guard \u5148\u78ba\u8a8d\u904e\u7b54\u6848\u6b63\u78ba\uff0c\u9019\u88e1\u53ea\u63d0\u4ea4\u4e00\u6b21\uff0c\u907f\u514d\u91cd\u8907\u8a08\u5206\uff08N20\uff09\u3002"""
+
+    def __init__(self, questioningState: QuestioningState):
+        self.questioningState = questioningState
+
+    def execute(self, event: Event) -> None:
+        if not isinstance(event, MessagePostedEvent) or self.questioningState.game is None:
+            return
+        self.questioningState.game.submitAnswer(event.getSourceId(), event.message.content)
 
 
 class CarryGameToThanksForJoiningAction(Action):
