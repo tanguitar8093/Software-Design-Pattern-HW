@@ -1,0 +1,174 @@
+classDiagram
+    direction LR
+
+    %% ======================= 本檔案是 App 層（hw8-5/v1/app）的完整版 =======================
+    %% 背景：BotFacade（見 oodv4-7-botfacade-runtime.mmd）組裝完成後，補上應用層讓 Client 能
+    %% 用 README 規定的文字事件驅動整個 Bot，並把網域事件轉成規定格式的逐行輸出。
+    %% 過程中發現並修正兩個既有設計缺口：
+    %% 1. WaterCommunity 補上 postMessage/createPost/addComment/startBroadcast/speak/stopBroadcast
+    %%    代理方法，App 層才不需要直接碰 ChatRoom/Forum/Broadcast 私有物件。
+    %% 2. CommentAddedEvent 補上 postId 欄位，TranscriptObserver 才能印出「comment in post <id>」。
+    %% 簡化版（只畫大類別/介面，無便條紙）見 oodv4-8-app-overview.mmd
+    %% 便條紙全文見 oodv4-4-notes.md（N58~N63，延續 oodv4-1~oodv4-7 的共用編號）
+
+    %% ------------------------------------------------
+    %% Application Layer：main.py（CLI 入口，module-level function 故不畫成類別方法）
+    %% ------------------------------------------------
+    class Client {
+        <<Application Layer / CLI Entrypoint>>
+        +main() void
+    }
+
+    %% ------------------------------------------------
+    %% 輸入解析
+    %% ------------------------------------------------
+    class ParsedEvent {
+        +name: str
+        +payload: dict
+    }
+
+    class EventLineParser {
+        <<module-level function>>
+        +parseLine(rawLine: str) ParsedEvent
+    }
+
+    %% ------------------------------------------------
+    %% 驅動器：App 層唯一入口，查表分派到 WaterCommunity/BotFacade
+    %% ------------------------------------------------
+    class AppDriver {
+        -output: list~str~
+        -community: WaterCommunity
+        -bot: Bot
+        -_handlers: dict~str, Callable~
+        +run(lines: list~str~) list~str~
+        -_dispatch(parsed: ParsedEvent) void
+        -_handleStarted(payload: dict) void
+        -_handleLogin(payload: dict) void
+        -_handleLogout(payload: dict) void
+        -_handleElapsed(payload: dict) void
+        -_handleNewMessage(payload: dict) void
+        -_handleNewPost(payload: dict) void
+        -_handleGoBroadcasting(payload: dict) void
+        -_handleSpeak(payload: dict) void
+        -_handleStopBroadcasting(payload: dict) void
+    }
+
+    %% ------------------------------------------------
+    %% 輸出：訂閱既有的 EventPublisher，跟 Bot 的訂閱互不影響
+    %% ------------------------------------------------
+    class TranscriptObserver {
+        -output: list~str~
+        +getId() str
+        +onEvent(event: DomainEvent) void
+        -_format(event: DomainEvent) str|None
+    }
+
+    class CommunityObserver {
+        <<interface>>
+        +getId() str
+        +onEvent(event: DomainEvent) void
+    }
+
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+
+    class TimeElapsedEvent
+    class MessagePostedEvent
+    class PostCreatedEvent
+    class CommentAddedEvent {
+        +postId: str
+        +comment: Comment
+    }
+    class BroadcastStartedEvent
+    class VoiceSpokenEvent
+    class BroadcastStoppedEvent
+
+    DomainEvent <|.. TimeElapsedEvent
+    DomainEvent <|.. MessagePostedEvent
+    DomainEvent <|.. PostCreatedEvent
+    DomainEvent <|.. CommentAddedEvent
+    DomainEvent <|.. BroadcastStartedEvent
+    DomainEvent <|.. VoiceSpokenEvent
+    DomainEvent <|.. BroadcastStoppedEvent
+
+    %% ------------------------------------------------
+    %% 既有的社群基礎設施（完整定義見 oodv4-7-botfacade-runtime.mmd），這裡只列 App 層會用到的部分
+    %% ------------------------------------------------
+    class EventPublisher {
+        +register(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+
+    class WaterCommunity {
+        +login(participant: Participant) void
+        +logout(participantId: str) void
+        +elapseTime(amount: int, unit: str) void
+        +postMessage(authorId: str, content: str, tags: list~str~) void
+        +createPost(id: str, authorId: str, title: str, content: str, tags: list~str~) void
+        +addComment(postId: str, authorId: str, content: str, tags: list~str~) void
+        +startBroadcast(speakerId: str) void
+        +speak(speakerId: str, content: str) void
+        +stopBroadcast(speakerId: str) void
+        +getEventPublisher() EventPublisher
+    }
+
+    class Member {
+        -id: str
+        -role: Role
+    }
+
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+
+    class BotFacade {
+        -bot: Bot
+        +__init__(community: WaterCommunity, quota: int, description: str)
+    }
+
+    class Bot {
+        <<CommunityObserver>>
+        +quota: int
+    }
+
+    Member --> Role : role
+    WaterCommunity "1" *-- "1" EventPublisher : 擁有
+    EventPublisher "1" o-- "0..*" CommunityObserver : observers
+    EventPublisher ..> DomainEvent : notify(event)
+    CommunityObserver <|.. TranscriptObserver
+    CommunityObserver <|.. Bot
+
+    %% ------------------------------------------------
+    %% 關聯：Client -> AppDriver -> {EventLineParser, WaterCommunity, BotFacade, TranscriptObserver}
+    %% ------------------------------------------------
+    Client ..> AppDriver : run(stdin lines)
+
+    AppDriver ..> EventLineParser : parseLine(rawLine)
+    EventLineParser ..> ParsedEvent : 建立
+
+    AppDriver "1" --> "0..1" WaterCommunity : community
+    AppDriver "1" --> "0..1" Bot : bot
+    AppDriver ..> Member : 依 login payload 建立
+    AppDriver ..> BotFacade : _handleStarted() 建立
+    BotFacade "1" --> "1" Bot : 建立
+    AppDriver ..> TranscriptObserver : _handleStarted() 建立並註冊
+    AppDriver ..> WaterCommunity : login/logout/elapseTime/postMessage/createPost/addComment/startBroadcast/speak/stopBroadcast
+
+    TranscriptObserver ..> TimeElapsedEvent : 格式化
+    TranscriptObserver ..> MessagePostedEvent : 格式化（區分成員/機器人）
+    TranscriptObserver ..> PostCreatedEvent : 格式化
+    TranscriptObserver ..> CommentAddedEvent : 格式化（只印機器人留言）
+    TranscriptObserver ..> BroadcastStartedEvent : 格式化（區分成員/機器人）
+    TranscriptObserver ..> VoiceSpokenEvent : 格式化（區分成員/機器人）
+    TranscriptObserver ..> BroadcastStoppedEvent : 格式化（區分成員/機器人）
+
+    note for AppDriver "N58"
+    note for AppDriver "N59"
+    note for EventLineParser "N60"
+    note for TranscriptObserver "N61"
+    note for WaterCommunity "N62"
+    note for CommentAddedEvent "N63"

@@ -1,0 +1,142 @@
+classDiagram
+    direction LR
+
+    %% ======================= 重點簡化版：只畫「大類別/介面」，具體子類別一律用便條紙帶過 =======================
+    %% 完整版（含所有具體子類別與細節依賴）見 oodv4-7-botfacade-runtime.mmd + oodv4-4-notes.md（N1~N57）
+    %% 這張圖的關聯線只在「大類別之間」，不會有任何一條線連到具體子類別
+
+    %% ======================= 社群基礎設施 =======================
+    class WaterCommunity {
+        +login/logout/elapseTime()
+        +getOnlineParticipants()/getOnlineCount()
+        +postBotReply/postBotComment/postBotVoice()
+    }
+    class Participant {
+        <<abstract>>
+    }
+    class ChatRoom
+    class Forum
+    class Broadcast
+
+
+    WaterCommunity "1" o-- "0..*" Participant : 線上參與者
+    WaterCommunity "1" *-- "1" ChatRoom
+    WaterCommunity "1" *-- "1" Forum
+    WaterCommunity "1" *-- "1" Broadcast
+    WaterCommunity "1" *-- "1" EventPublisher
+
+    %% ======================= 事件系統 =======================
+    class EventPublisher {
+        +register/unregister(observer) void
+        +notify(event: DomainEvent) void
+    }
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+    class CommunityObserver {
+        <<interface>>
+        +onEvent(event: DomainEvent) void
+    }
+
+    ChatRoom ..> EventPublisher : notify
+    Forum ..> EventPublisher : notify
+    Broadcast ..> EventPublisher : notify
+    WaterCommunity ..> EventPublisher : notify
+    EventPublisher "1" o-- "0..*" CommunityObserver : observers
+    EventPublisher ..> DomainEvent : notify(event)
+    CommunityObserver <|.. Bot
+
+    %% ======================= FSM 模組（地基，完整定義見 fsm-ooa-4.mmd） =======================
+    class Trigger {
+        <<interface>>
+        +isTriggeredBy(event) bool
+    }
+    class Guard {
+        <<interface>>
+        +isSatisfied(event) bool
+    }
+    class Action {
+        <<interface>>
+        +execute(event) void
+    }
+    class StateNode {
+        <<interface>>
+        +onEnter/onExit(event) void
+        +fire(event) bool
+    }
+    class FiniteStateMachine {
+        +addTransition(transition) void
+        +fire(event) bool
+    }
+    class Transition {
+        +isApplicable(currentState, event) bool
+    }
+    class InitialStateSelector {
+        <<interface>>
+        +select(event) StateNode
+    }
+
+
+    StateNode <|.. FiniteStateMachine : 可巢狀（子狀態機）
+    FiniteStateMachine "1" --> "1" InitialStateSelector
+    FiniteStateMachine "1" o-- "0..*" Transition
+    Transition ..> Trigger
+    Transition ..> Guard
+    Transition ..> Action
+    Transition --> StateNode : from/to
+    Guard ..> Bot : 多數具體 Guard 依賴 Bot 唯讀方法
+    Action ..> Bot : 多數具體 Action 依賴 Bot 唯讀方法
+    Trigger ..> DomainEvent : 型別/內容比對
+
+    %% ======================= 原地反應 =======================
+    class InternalReaction {
+        +isApplicable(activeLeafState, event) bool
+    }
+
+    InternalReaction ..> StateNode
+    InternalReaction ..> Trigger
+    InternalReaction ..> Guard : 可選
+    InternalReaction ..> Action
+
+    %% ======================= Bot 主體與領域物件 =======================
+    class Bot {
+        +onEvent(event) void
+        +replyChatMessage/commentPost/broadcastVoice()
+        +getOnlineCount/isBroadcasting/getParticipant()
+        +addInternalReaction(reaction) void
+    }
+    class BotFacade {
+        -bot: Bot
+        +__init__(community: WaterCommunity, quota: int, description: str) void
+        -_wireInternalReactions(bot, default, interacting, recording, questioning, answerCorrectGuard, lastQuestionGuard) void
+        -_formatQuestion(questioning) str
+        -_buildQuestions() list~Question~
+    }
+    note for BotFacade "BF1 __init__\n主要行為：以 community、quota、description 建立 Bot；組裝 Normal／Record／KnowledgeKing 子 FSM、轉移及原地反應，初始化根 FSM。\n觸發時機：App 建立 BotFacade 實例時。\n被誰觸發：App 層建立機器人的程式碼。\n會觸發誰：建構 Bot／State／FSM／Transition 等元件；呼叫 _buildQuestions()、_wireInternalReactions()、rootFsm.onEnter(None)。"
+    note for BotFacade "BF2 _wireInternalReactions\n主要行為：組裝 Default／Interacting 的聊天與論壇反應、Recording 的語音反應，以及 Questioning 的答題反應，共六條。\n觸發時機：__init__ 完成狀態與轉移組裝後、根 FSM 初始化前。\n被誰觸發：BotFacade.__init__()。\n會觸發誰：建構六個 InternalReaction 及其 Trigger／Guard／Action，逐條呼叫 bot.addInternalReaction()。"
+    note for BotFacade "BF3 _formatQuestion\n主要行為：將當前題目組成題號加題目敘述的字串。\n觸發時機：Questioning 進場出題，或答對非最後一題後要出下一題時。\n被誰觸發：SendChatMessageAction.execute() 執行內容提供函式時。\n會觸發誰：questioning.game.getCurrentQuestion()；將字串回傳給 SendChatMessageAction。"
+    note for BotFacade "BF4 _buildQuestions\n主要行為：建立知識王遊戲的三道固定題目並回傳題目清單。\n觸發時機：BotFacade 建構時，組裝 KnowledgeKing 轉移前。\n被誰觸發：BotFacade.__init__()。\n會觸發誰：建構三個 Question；將清單交還 __init__ 供 CreateKnowledgeKingGameAction 使用。"
+    class KnowledgeKingGame {
+        +submitAnswer/isFinished/getWinner()
+    }
+    class RecordingSession {
+        +addVoice/generateReplay()
+    }
+
+    Bot "1" --> "1" FiniteStateMachine : rootFsm
+    Bot "1" o-- "0..*" InternalReaction
+    Bot ..> WaterCommunity : 全委派型（不持有 ChatRoom/Forum/Broadcast）
+    Bot ..> StateNode : 沿 currentState 鏈找目前 leaf state
+    StateNode o-- "0..1" RecordingSession : Recording 子類別持有
+    StateNode o-- "0..1" KnowledgeKingGame : Questioning/ThanksForJoining 子類別持有
+
+    BotFacade "1" --> "1" Bot
+    BotFacade ..> WaterCommunity : 建構 Bot
+    BotFacade ..> StateNode : 組裝具體狀態
+    BotFacade ..> FiniteStateMachine : 組裝 Normal/Record/KnowledgeKing 三個複合子 FSM
+    BotFacade ..> Transition : 組裝
+    BotFacade ..> InternalReaction : 組裝
+    BotFacade ..> Guard : 組裝具體 Guard
+    BotFacade ..> Action : 組裝具體 Action
+    BotFacade ..> Trigger : 組裝具體 Trigger

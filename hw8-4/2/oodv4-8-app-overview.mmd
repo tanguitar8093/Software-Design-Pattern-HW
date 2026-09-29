@@ -1,0 +1,71 @@
+classDiagram
+    direction LR
+
+    %% ======================= 重點簡化版：App 層（hw8-5/v1/app）只畫「大類別/介面」關聯 =======================
+    %% 完整版（含所有具體方法與細節依賴）見 oodv4-8-app-runtime.mmd + oodv4-4-notes.md（N58~N63）
+    %% 這張圖不放任何便條紙，只呈現 App 層新增的類別如何接上既有的 Bot 模組
+
+    %% ------------------------------------------------
+    %% Application Layer：main.py + v1/app/*
+    %% ------------------------------------------------
+    class Client {
+        <<Application Layer / CLI Entrypoint>>
+        +main() void
+    }
+
+    class AppDriver {
+        <<Application Layer / Driver>>
+        +run(lines: list~str~) list~str~
+    }
+
+    class EventLineParser {
+        <<function>>
+        +parseLine(rawLine: str) ParsedEvent
+    }
+
+    class ParsedEvent {
+        +name: str
+        +payload: dict
+    }
+
+    class TranscriptObserver {
+        <<CommunityObserver>>
+        +onEvent(event: DomainEvent) void
+    }
+
+    %% ------------------------------------------------
+    %% 既有的 Bot 模組（詳細定義見 oodv4-7-botfacade-runtime.mmd）
+    %% ------------------------------------------------
+    class CommunityObserver {
+        <<interface>>
+        +onEvent(event: DomainEvent) void
+    }
+
+    class WaterCommunity {
+        +login/logout/elapseTime()
+        +postMessage/createPost/addComment()
+        +startBroadcast/speak/stopBroadcast()
+        +getEventPublisher() EventPublisher
+    }
+
+    class BotFacade {
+        +__init__(community: WaterCommunity, quota: int, description: str)
+    }
+
+    class Bot {
+        <<CommunityObserver>>
+    }
+
+    %% ------------------------------------------------
+    %% 關聯：App 層只依賴 WaterCommunity/BotFacade，不觸碰 ChatRoom/Forum/Broadcast
+    %% ------------------------------------------------
+    Client ..> AppDriver : run(lines)
+    AppDriver ..> EventLineParser : parseLine(rawLine)
+    EventLineParser ..> ParsedEvent : 建立
+    AppDriver ..> WaterCommunity : 依 payload 呼叫成員操作
+    AppDriver ..> BotFacade : 建立 Bot
+    BotFacade "1" --> "1" Bot : 建立
+    AppDriver ..> TranscriptObserver : 建立並註冊
+    TranscriptObserver ..|> CommunityObserver
+    Bot ..|> CommunityObserver
+    WaterCommunity "1" o-- "0..*" CommunityObserver : observers（經 EventPublisher）

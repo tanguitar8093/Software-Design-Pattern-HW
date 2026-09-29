@@ -16,6 +16,11 @@
 三個複合 FSM + 六條 `InternalReaction`），並修正 `IsRecorderGuard`/`CreateRecordingSessionAction`/`Bot.getOnlineCount()`/
 `Bot.onEvent()` 幾個原本設計有誤的地方，新增 N43～N57，詳見 [oodv4-7-botfacade-runtime-diff.md](oodv4-7-botfacade-runtime-diff.md)。
 
+[oodv4-8-app-runtime.mmd](oodv4-8-app-runtime.mmd) 在 `BotFacade` 之上補齊應用層（`hw8-5/v1/app`），新增
+`AppDriver`/`EventLineParser`/`ParsedEvent`/`TranscriptObserver` 四個類別，並修正 `WaterCommunity` 缺少對稱
+代理方法、`CommentAddedEvent` 缺少 `postId` 兩處既有缺口，新增 N58～N63；簡化版見
+[oodv4-8-app-overview.mmd](oodv4-8-app-overview.mmd)（無便條紙）。
+
 ## N1 — Participant
 
 代表社群中活生生的人，是所有社群社交、內容創作、語音交流以及參與操作的憑證持有者。
@@ -427,3 +432,52 @@ Null Object：給不需要 entry/exit 行為的狀態卡位用（FSM 模組的 `
   歸零，需要一個進場動作顯式重置。
 - **依賴**：`DefaultConversationState.replyCycleIndex` 或 `InteractingState.replyCycleIndex`（同一顆類別，
   duck-typing 共用）
+
+## N58 — AppDriver（建構與 dispatch table）
+
+- **對應**：`hw8-5/v1/app/driver.py` 的 `AppDriver`。以「事件名稱 → handler 方法」的 `dict` 做查表分派
+  （Table-Driven Dispatcher），不是 GoF 的 Command Pattern：每個 handler 只是「解析 payload、轉呼叫
+  `WaterCommunity`/`BotFacade`」，沒有 undo/redo/排隊的需求，硬包成獨立 `Command` 物件只會多一層無謂的
+  轉呼叫。
+- **依賴**：`EventLineParser.parseLine()`（N60）
+
+## N59 — AppDriver 各 \_handle\* 方法
+
+- **對應**：`_handleStarted` 建立 `WaterCommunity`、註冊 `TranscriptObserver`、建立 `BotFacade`；
+  `_handleLogin`/`_handleLogout` 建立/移除 `Member`；`_handleElapsed` 呼叫 `WaterCommunity.elapseTime()`；
+  `_handleNewMessage`/`_handleNewPost`/`_handleGoBroadcasting`/`_handleSpeak`/`_handleStopBroadcasting`
+  全部只帶 `authorId`/`speakerId` 字串呼叫 `WaterCommunity` 對應代理方法，不需要建立或持有 `Member` 物件
+  本身（登入時建立的 `Member` 只用來承載身分登入，後續動作走 `WaterCommunity` 代理，不再經過它）。
+- **依賴**：`WaterCommunity` 的代理方法（N62）、`BotFacade`
+
+## N60 — EventLineParser.parseLine()
+
+- **對應**：把一行輸入解析成 `(事件名稱, payload dict)`；特例處理 `[<n> <unit> elapsed]` 跟 `[end]`，其餘
+  一律走 `[event] {json}` 格式。
+- **依賴**：無其他類別依賴，是純函式工具，不持有狀態。
+
+## N61 — TranscriptObserver 格式化規則
+
+- **對應**：另外訂閱同一個 `EventPublisher`（跟 `Bot` 的訂閱互不影響），把七種 `DomainEvent` 子類別轉成
+  輸出格式規定的逐行文字（`🕑`/`💬`/`🤖`/`📢`⋯），依 `authorId`/`speakerId` 是否等於 `BOT_ID` 決定成員版
+  式或機器人版式。`CommentAddedEvent` 只有機器人留言有定義輸出格式，成員留言回傳 `None`（不輸出）。
+- **依賴**：`CommentAddedEvent.postId`（N63）
+
+## N62 — WaterCommunity 新增的代理方法
+
+- **對應**：新增 `postMessage`/`createPost`/`addComment`/`startBroadcast`/`speak`/`stopBroadcast`，對稱於
+  既有的 `postBotReply`/`postBotComment`/`postBotVoice`（Bot 全委派型：不持有 `ChatRoom`/`Forum`/
+  `Broadcast`）。
+- **問題**：`Member` 原本的 `sendMessage`/`publishPost`/`commentPost`/`startBroadcast`/`speak`/
+  `stopBroadcast` 都要求呼叫端直接傳入 `ChatRoom`/`Forum`/`Broadcast` 實例，但這三個物件在
+  `WaterCommunity` 是私有屬性（`_chatRoom`/`_forum`/`_broadcast`），沒有對外的 getter；App 層若要驅動就
+  得破壞封裝去戳私有屬性，或是每個事件都額外建立、持有一份 `Member` 物件。
+- **修正**：比照 `Bot` 那側的委派風格，讓 App 層只需要 `authorId`/`speakerId` 字串就能發動作，完全不用碰
+  `Member` 物件或內部頻道物件。
+
+## N63 — CommentAddedEvent 補上 postId
+
+- **對應**：`Forum.addComment()` 發布事件時一併帶入 `postId`。
+- **問題**：原本 `CommentAddedEvent` 只帶 `comment`（作者/內容/標記），`TranscriptObserver` 想印
+  「`🤖 comment in post <post id>: ...`」缺這個資訊，無法還原輸出格式規定的那一行。
+- **修正**：建構子多一個 `postId: str` 參數，`Forum.addComment(postId, comment)` 呼叫時一併傳入。
