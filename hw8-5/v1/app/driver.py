@@ -1,11 +1,14 @@
 from datetime import datetime as DateTime
-from typing import Callable, Optional
+from typing import Callable, Final, Optional
 
 from ..bot.bot import Bot
 from ..bot.facade import BotFacade
 from ..community.community import Member, Role, WaterCommunity
 from .event_line_parser import ParsedEvent, parseLine
+from .event_type import InputEventType
 from .transcript_observer import TranscriptObserver
+
+START_TIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
 
 
 class AppDriver:
@@ -15,15 +18,15 @@ class AppDriver:
         self.output: list[str] = output if output is not None else []
         self.community: Optional[WaterCommunity] = None
         self.bot: Optional[Bot] = None
-        self._handlers: dict[str, Callable[[dict], None]] = {
-            "started": self._handleStarted,
-            "login": self._handleLogin,
-            "logout": self._handleLogout,
-            "new message": self._handleNewMessage,
-            "new post": self._handleNewPost,
-            "go broadcasting": self._handleGoBroadcasting,
-            "speak": self._handleSpeak,
-            "stop broadcasting": self._handleStopBroadcasting,
+        self._handlers: dict[InputEventType, Callable[[dict], None]] = {
+            InputEventType.STARTED: self._handleStarted,
+            InputEventType.LOGIN: self._handleLogin,
+            InputEventType.LOGOUT: self._handleLogout,
+            InputEventType.NEW_MESSAGE: self._handleNewMessage,
+            InputEventType.NEW_POST: self._handleNewPost,
+            InputEventType.GO_BROADCASTING: self._handleGoBroadcasting,
+            InputEventType.SPEAK: self._handleSpeak,
+            InputEventType.STOP_BROADCASTING: self._handleStopBroadcasting,
         }
 
     def run(self, lines: list[str]) -> list[str]:
@@ -31,13 +34,13 @@ class AppDriver:
             parsed = parseLine(rawLine)
             if parsed is None:
                 continue
-            if parsed.name == "end":
+            if parsed.name is InputEventType.END:
                 break
             self._dispatch(parsed)
         return self.output
 
     def _dispatch(self, parsed: ParsedEvent) -> None:
-        if parsed.name == "elapsed":
+        if parsed.name is InputEventType.ELAPSED:
             self._handleElapsed(parsed.payload)
             return
         handler = self._handlers.get(parsed.name)
@@ -45,10 +48,13 @@ class AppDriver:
             handler(parsed.payload)
 
     def _handleStarted(self, payload: dict) -> None:
-        currentTime = DateTime.strptime(payload["time"], "%Y-%m-%d %H:%M:%S")
+        quota = payload.get("quota")
+        if type(quota) is not int or quota <= 0:
+            raise ValueError("[started] quota must be a positive integer")
+        currentTime = DateTime.strptime(payload["time"], START_TIME_FORMAT)
         self.community = WaterCommunity(currentTime)
         self.community.getEventPublisher().register(TranscriptObserver(self.output))
-        facade = BotFacade(self.community, quota=payload.get("quota", 20))
+        facade = BotFacade(self.community, quota=quota)
         self.bot = facade.bot
 
     def _handleLogin(self, payload: dict) -> None:

@@ -57,7 +57,7 @@ from .triggers.triggers import (
 class BotFacade:
     """對外唯一入口：把「組一堆 State/Guard/Action/Trigger/Transition 才能生出 Bot」的複雜度包起來。"""
 
-    def __init__(self, community: WaterCommunity, quota: int = 20, description: str = "Waterball 知識王機器人"):
+    def __init__(self, community: WaterCommunity, quota: int, description: str = "Waterball 知識王機器人"):
         noop = NoopAction()
         default = DefaultConversationState(noop, noop, messages=["good to hear", "thank you", "How are you"])
         interacting = InteractingState(noop, noop, messages=["Hi hi😁", "I like your idea!"])

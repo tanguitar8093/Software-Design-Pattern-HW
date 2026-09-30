@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from v1.app.driver import AppDriver
@@ -15,6 +16,34 @@ class AppDriverTest(unittest.TestCase):
         self.assertIsNotNone(driver.bot)
         assert driver.bot is not None
         self.assertEqual(driver.bot.quota, 20)
+
+    def test_started_accepts_any_positive_integer_quota(self) -> None:
+        for quota in (1, 10, 20):
+            with self.subTest(quota=quota):
+                driver = self._start(quota=quota)
+                assert driver.bot is not None
+                self.assertEqual(driver.bot.quota, quota)
+
+    def test_started_requires_quota(self) -> None:
+        driver = AppDriver()
+        with self.assertRaisesRegex(ValueError, "quota must be a positive integer"):
+            driver.run(['[started] {"time": "2023-08-07 00:00:00"}'])
+        self.assertIsNone(driver.community)
+        self.assertIsNone(driver.bot)
+
+    def test_started_rejects_invalid_quota(self) -> None:
+        for value in (0, -1, True, False, None, 1.5, "10"):
+            with self.subTest(quota=value):
+                driver = AppDriver()
+                with self.assertRaisesRegex(ValueError, "quota must be a positive integer"):
+                    payload = json.dumps({"time": "2023-08-07 00:00:00", "quota": value})
+                    driver.run([f"[started] {payload}"])
+                self.assertIsNone(driver.community)
+                self.assertIsNone(driver.bot)
+
+    def test_unknown_event_is_ignored(self) -> None:
+        driver = self._start()
+        self.assertEqual(driver.run(['[future event] {"newField": 1}']), [])
 
     def test_login_and_logout_change_online_count(self) -> None:
         driver = self._start()
