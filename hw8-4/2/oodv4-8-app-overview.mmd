@@ -1,71 +1,82 @@
 classDiagram
     direction LR
 
-    %% ======================= 重點簡化版：App 層（hw8-5/v1/app）只畫「大類別/介面」關聯 =======================
-    %% 完整版（含所有具體方法與細節依賴）見 oodv4-8-app-runtime.mmd + oodv4-4-notes.md（N58~N63）
-    %% 這張圖不放任何便條紙，只呈現 App 層新增的類別如何接上既有的 Bot 模組
-
-    %% ------------------------------------------------
-    %% Application Layer：main.py + v1/app/*
-    %% ------------------------------------------------
-    class Client {
-        <<Application Layer / CLI Entrypoint>>
-        +main() void
-    }
+    %% App 層現況：一條按職責分組的責任鏈；handle() 同時是樣板方法。
+    %% main()、parseLine()、build_handler_chain() 是模組函式，不另畫成類別。
+    %% 具體操作與網域事件見 oodv4-8-app-runtime.mmd；行為說明見 oodv4-8-app-overview-interactions.md。
 
     class AppDriver {
-        <<Application Layer / Driver>>
+        -_context: HandlerContext
+        -_handler_chain: EventHandler
         +run(lines: list~str~) list~str~
     }
-
-    class EventLineParser {
-        <<function>>
-        +parseLine(rawLine: str) ParsedEvent
-    }
-
     class ParsedEvent {
-        +name: str
+        +name: InputEventType
         +payload: dict
+        +rawName: str|None
     }
-
+    class HandlerContext {
+        +output: list~str~
+        +community: WaterCommunity|None
+        +bot: Bot|None
+    }
+    class EventHandler {
+        <<abstract>>
+        -_next_handler: EventHandler|None
+        +handle(request: ParsedEvent, context: HandlerContext) HandlingResult
+        +can_handle(request: ParsedEvent) bool
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class LifecycleHandler {
+        +event_types: frozenset
+    }
+    class MembershipHandler {
+        +event_types: frozenset
+    }
+    class ActivityHandler {
+        +event_types: frozenset
+    }
+    class UnknownEventHandler {
+        <<terminal>>
+    }
     class TranscriptObserver {
-        <<CommunityObserver>>
         +onEvent(event: DomainEvent) void
     }
-
-    %% ------------------------------------------------
-    %% 既有的 Bot 模組（詳細定義見 oodv4-7-botfacade-runtime.mmd）
-    %% ------------------------------------------------
     class CommunityObserver {
         <<interface>>
         +onEvent(event: DomainEvent) void
     }
-
     class WaterCommunity {
-        +login/logout/elapseTime()
-        +postMessage/createPost/addComment()
-        +startBroadcast/speak/stopBroadcast()
         +getEventPublisher() EventPublisher
     }
-
-    class BotFacade {
-        +__init__(community: WaterCommunity, quota: int, description: str)
+    class EventPublisher {
+        +register(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
     }
-
+    class BotFacade {
+        +__init__(community: WaterCommunity, quota: int)
+    }
     class Bot {
         <<CommunityObserver>>
     }
 
-    %% ------------------------------------------------
-    %% 關聯：App 層只依賴 WaterCommunity/BotFacade，不觸碰 ChatRoom/Forum/Broadcast
-    %% ------------------------------------------------
-    Client ..> AppDriver : run(lines)
-    AppDriver ..> EventLineParser : parseLine(rawLine)
-    EventLineParser ..> ParsedEvent : 建立
-    AppDriver ..> WaterCommunity : 依 payload 呼叫成員操作
-    AppDriver ..> BotFacade : 建立 Bot
-    BotFacade "1" --> "1" Bot : 建立
-    AppDriver ..> TranscriptObserver : 建立並註冊
+    AppDriver *-- HandlerContext : 持有執行狀態
+    AppDriver --> EventHandler : 持有鏈首
+    AppDriver ..> ParsedEvent : parseLine(rawLine) 建立
+    EventHandler --> "0..1" EventHandler : next（不匹配則轉交）
+    EventHandler ..> ParsedEvent : can_handle
+    EventHandler ..> HandlerContext : execute
+    EventHandler <|-- LifecycleHandler
+    EventHandler <|-- MembershipHandler
+    EventHandler <|-- ActivityHandler
+    EventHandler <|-- UnknownEventHandler
+    LifecycleHandler ..> WaterCommunity : started 建立
+    LifecycleHandler ..> BotFacade : started 建立
+    LifecycleHandler ..> TranscriptObserver : started 註冊
+    MembershipHandler ..> WaterCommunity : login/logout
+    ActivityHandler ..> WaterCommunity : 時間／內容／廣播操作
+    BotFacade --> Bot : 建立
+    WaterCommunity *-- EventPublisher : 擁有
+    EventPublisher o-- "0..*" CommunityObserver : 訂閱者
     TranscriptObserver ..|> CommunityObserver
     Bot ..|> CommunityObserver
-    WaterCommunity "1" o-- "0..*" CommunityObserver : observers（經 EventPublisher）

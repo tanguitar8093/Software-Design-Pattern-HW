@@ -17,7 +17,7 @@
 `Bot.onEvent()` 幾個原本設計有誤的地方，新增 N43～N57，詳見 [oodv4-7-botfacade-runtime-diff.md](oodv4-7-botfacade-runtime-diff.md)。
 
 [oodv4-8-app-runtime.mmd](oodv4-8-app-runtime.mmd) 在 `BotFacade` 之上補齊應用層（`hw8-5/v1/app`），新增
-`AppDriver`/`EventLineParser`/`ParsedEvent`/`TranscriptObserver` 四個類別，並修正 `WaterCommunity` 缺少對稱
+`AppDriver`、`HandlerContext`、`ParsedEvent`、`TranscriptObserver` 與分組責任鏈，並修正 `WaterCommunity` 缺少對稱
 代理方法、`CommentAddedEvent` 缺少 `postId` 兩處既有缺口，新增 N58～N63；簡化版見
 [oodv4-8-app-overview.mmd](oodv4-8-app-overview.mmd)（無便條紙）。
 
@@ -433,28 +433,30 @@ Null Object：給不需要 entry/exit 行為的狀態卡位用（FSM 模組的 `
 - **依賴**：`DefaultConversationState.replyCycleIndex` 或 `InteractingState.replyCycleIndex`（同一顆類別，
   duck-typing 共用）
 
-## N58 — AppDriver（建構與 dispatch table）
+## N58 — AppDriver（輸入協調）
 
-- **對應**：`hw8-5/v1/app/driver.py` 的 `AppDriver`。以「事件名稱 → handler 方法」的 `dict` 做查表分派
-  （Table-Driven Dispatcher），不是 GoF 的 Command Pattern：每個 handler 只是「解析 payload、轉呼叫
-  `WaterCommunity`/`BotFacade`」，沒有 undo/redo/排隊的需求，硬包成獨立 `Command` 物件只會多一層無謂的
-  轉呼叫。
-- **依賴**：`EventLineParser.parseLine()`（N60）
+- **對應**：`hw8-5/v1/app/driver.py` 的 `AppDriver`。解析逐行輸入，將 `ParsedEvent` 與共享
+  `HandlerContext` 交給注入或預設的責任鏈；收到 `HandlingResult.STOP` 才結束。driver 不直接建立
+  Bot，也不分派或執行個別社群事件。
+- **依賴**：模組函式 `parseLine()`（N60）、`build_handler_chain()`、`EventHandler`（N59）。
 
-## N59 — AppDriver 各 \_handle\* 方法
+## N59 — EventHandler 樣板方法與按職責分組的責任鏈
 
-- **對應**：`_handleStarted` 建立 `WaterCommunity`、註冊 `TranscriptObserver`、建立 `BotFacade`；
-  `_handleLogin`/`_handleLogout` 建立/移除 `Member`；`_handleElapsed` 呼叫 `WaterCommunity.elapseTime()`；
-  `_handleNewMessage`/`_handleNewPost`/`_handleGoBroadcasting`/`_handleSpeak`/`_handleStopBroadcasting`
-  全部只帶 `authorId`/`speakerId` 字串呼叫 `WaterCommunity` 對應代理方法，不需要建立或持有 `Member` 物件
-  本身（登入時建立的 `Member` 只用來承載身分登入，後續動作走 `WaterCommunity` 代理，不再經過它）。
-- **依賴**：`WaterCommunity` 的代理方法（N62）、`BotFacade`
+- **對應**：`EventHandler.handle()` 固定「`can_handle(request)` → `execute(request, context)` 或
+  `forward(request, context)`」，不匹配時透過 `next` 傳遞；沒有下一節點仍須轉交時明確報錯。
+  `LifecycleHandler` 負責 started/end；`MembershipHandler` 負責 login/logout；
+  `ActivityHandler` 負責 elapsed、訊息、貼文、廣播；`UnknownEventHandler` 接住未匹配的事件。
+  `build_handler_chain()` 固定按此順序組裝，`HandlerContext` 保存 output/community/bot。
+- **依賴**：生命週期節點建立 `WaterCommunity`、先註冊 `TranscriptObserver`、再建立 `BotFacade`；
+  成員節點於登入建立 `Member`；活動節點只透過 `WaterCommunity` 代理方法（N62），不觸碰
+  `ChatRoom`/`Forum`/`Broadcast` 私有物件。已匹配的啟動前操作不轉交、直接略過。
 
-## N60 — EventLineParser.parseLine()
+## N60 — parseLine() 與 ParsedEvent
 
-- **對應**：把一行輸入解析成 `(事件名稱, payload dict)`；特例處理 `[<n> <unit> elapsed]` 跟 `[end]`，其餘
-  一律走 `[event] {json}` 格式。
-- **依賴**：無其他類別依賴，是純函式工具，不持有狀態。
+- **對應**：`event_line_parser.py` 的 `parseLine()` 是模組函式，不是 `EventLineParser` 類別。
+  把一行輸入解析為 `ParsedEvent(name: InputEventType, payload: dict, rawName: str|None)`；
+  特例處理 `[<n> <unit> elapsed]` 與 `[end]`，未知事件名稱保留在 `rawName`。
+- **依賴**：無狀態解析，不持有社群或責任鏈。
 
 ## N61 — TranscriptObserver 格式化規則
 

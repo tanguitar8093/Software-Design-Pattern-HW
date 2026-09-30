@@ -6,9 +6,10 @@ from v1.app.event_line_parser import ParsedEvent
 from v1.app.event_type import InputEventType
 from v1.app.handler_chain import build_handler_chain
 from v1.app.handler_context import HandlerContext
+from v1.app.handlers.activity import ActivityHandler
 from v1.app.handlers.base import EventHandler, HandlingResult
-from v1.app.handlers.lifecycle import EndHandler
-from v1.app.handlers.membership import LoginHandler
+from v1.app.handlers.lifecycle import LifecycleHandler
+from v1.app.handlers.membership import MembershipHandler
 from v1.community.community import WaterCommunity
 
 
@@ -40,7 +41,7 @@ class HandlerChainTest(unittest.TestCase):
         context = HandlerContext([])
         request = ParsedEvent(InputEventType.UNKNOWN, {}, rawName="future event")
 
-        self.assertIs(LoginHandler(terminal).handle(request, context), HandlingResult.CONTINUE)
+        self.assertIs(MembershipHandler(terminal).handle(request, context), HandlingResult.CONTINUE)
         self.assertEqual(terminal.requests, [request])
 
     def test_matching_request_is_handled_without_forwarding(self) -> None:
@@ -48,7 +49,7 @@ class HandlerChainTest(unittest.TestCase):
         community = WaterCommunity(datetime(2023, 8, 7))
         context = HandlerContext([], community=community)
 
-        result = LoginHandler(terminal).handle(ParsedEvent(InputEventType.LOGIN, {"userId": "1"}), context)
+        result = MembershipHandler(terminal).handle(ParsedEvent(InputEventType.LOGIN, {"userId": "1"}), context)
 
         self.assertIs(result, HandlingResult.CONTINUE)
         self.assertEqual(community.getOnlineCount(), 1)
@@ -58,12 +59,12 @@ class HandlerChainTest(unittest.TestCase):
         request = ParsedEvent(InputEventType.UNKNOWN, {}, rawName="future event")
 
         with self.assertRaisesRegex(RuntimeError, "no terminal handler"):
-            LoginHandler().handle(request, HandlerContext([]))
+            MembershipHandler().handle(request, HandlerContext([]))
 
     def test_matched_request_before_start_is_consumed_without_forwarding(self) -> None:
         terminal = TrackingTerminal()
 
-        result = LoginHandler(terminal).handle(ParsedEvent(InputEventType.LOGIN, {}), HandlerContext([]))
+        result = MembershipHandler(terminal).handle(ParsedEvent(InputEventType.LOGIN, {}), HandlerContext([]))
 
         self.assertIs(result, HandlingResult.CONTINUE)
         self.assertEqual(terminal.requests, [])
@@ -72,10 +73,23 @@ class HandlerChainTest(unittest.TestCase):
         terminal = TrackingTerminal()
         context = HandlerContext([])
 
-        result = EndHandler(terminal).handle(ParsedEvent(InputEventType.END, {}), context)
+        result = LifecycleHandler(terminal).handle(ParsedEvent(InputEventType.END, {}), context)
 
         self.assertIs(result, HandlingResult.STOP)
         self.assertEqual(terminal.requests, [])
+
+    def test_each_group_accepts_only_its_own_event_types(self) -> None:
+        groups = (
+            (LifecycleHandler(), {InputEventType.STARTED, InputEventType.END}),
+            (MembershipHandler(), {InputEventType.LOGIN, InputEventType.LOGOUT}),
+            (ActivityHandler(), {
+                InputEventType.ELAPSED, InputEventType.NEW_MESSAGE, InputEventType.NEW_POST,
+                InputEventType.GO_BROADCASTING, InputEventType.SPEAK, InputEventType.STOP_BROADCASTING,
+            }),
+        )
+        for handler, event_types in groups:
+            for event_type in InputEventType:
+                self.assertEqual(handler.can_handle(ParsedEvent(event_type, {})), event_type in event_types)
 
     def test_unknown_event_is_handled_at_default_chain_tail(self) -> None:
         context = HandlerContext([])

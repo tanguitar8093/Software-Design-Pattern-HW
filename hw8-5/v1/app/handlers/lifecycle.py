@@ -12,10 +12,12 @@ from .base import EventHandler, HandlingResult
 START_TIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
 
 
-class StartedHandler(EventHandler):
-    event_type = InputEventType.STARTED
+class LifecycleHandler(EventHandler):
+    event_types = frozenset((InputEventType.STARTED, InputEventType.END))
 
     def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
+        if request.name is InputEventType.END:
+            return HandlingResult.STOP
         payload = request.payload
         quota = payload.get("quota")
         if type(quota) is not int or quota <= 0:
@@ -27,13 +29,6 @@ class StartedHandler(EventHandler):
         facade = BotFacade(community, quota=quota)
         context.bot = facade.bot
         return HandlingResult.CONTINUE
-
-
-class EndHandler(EventHandler):
-    event_type = InputEventType.END
-
-    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        return HandlingResult.STOP
 
 
 class UnknownEventHandler(EventHandler):

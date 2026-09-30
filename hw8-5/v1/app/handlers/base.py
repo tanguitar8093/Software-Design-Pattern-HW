@@ -15,7 +15,7 @@ class HandlingResult(Enum):
 class EventHandler(ABC):
     """固定的責任鏈流程：先判斷接手者，否則轉交下一節點。"""
 
-    event_type: ClassVar[InputEventType]
+    event_types: ClassVar[frozenset[InputEventType]] = frozenset()
 
     def __init__(self, next_handler: Optional["EventHandler"] = None):
         self._next_handler = next_handler
@@ -32,8 +32,8 @@ class EventHandler(ABC):
         return self.forward(request, context)
 
     def can_handle(self, request: ParsedEvent) -> bool:
-        """預設按事件種類匹配；特殊節點可覆寫此判斷。"""
-        return request.name is self.event_type
+        """預設按所負責的事件集合匹配；特殊節點可覆寫此判斷。"""
+        return request.name in self.event_types
 
     @abstractmethod
     def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
