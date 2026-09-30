@@ -17,7 +17,7 @@ stdin → main() → AppDriver.run() → parseLine() → ParsedEvent
                                              run() 回傳 output → main() 逐項 print
 ```
 
-請求沿 `build_handler_chain()` 建立的節點依序傳遞；符合事件種類者處理，否則 `forward()` 給下一個。`EndHandler` 回傳 `STOP` 讓 driver 結束，鏈尾 `UnknownEventHandler` 接住未匹配事件並維持既有靜默略過的行為。空行／缺少 `]` 由 parser 回 `None`、不進入鏈；JSON 錯誤等解析例外仍由 parser 提出，並不保證「任何原始文字」都能成功處理。此階段只抽責任鏈，concrete handler 仍各自實作判斷與轉交；共用樣板方法尚未套用。
+請求沿 `build_handler_chain()` 建立的節點依序傳遞。`EventHandler.handle()` 是樣板方法：先呼叫可覆寫的 `can_handle(request)`；符合者呼叫子類的 `execute(request, context)`，否則透過 `forward()` 給下一節點。一般 handler 只需宣告 `event_type` 並實作 `execute()`；需要更細匹配的 handler 可覆寫 `can_handle()`。`EndHandler` 回傳 `STOP` 讓 driver 結束，鏈尾 `UnknownEventHandler` 的 `can_handle()` 永遠為真，接住未匹配事件並維持既有靜默略過的行為。空行／缺少 `]` 由 parser 回 `None`、不進入鏈；JSON 錯誤等解析例外仍由 parser 提出，並不保證「任何原始文字」都能成功處理。
 
 `[started]` 會**先註冊 TranscriptObserver，後由 BotFacade 建立並註冊 Bot**。`notify()` 同步依註冊順序逐一呼叫 observer；因此原始事件先被加入逐字稿，Bot 的後續回覆再由巢狀發布的新事件加入。這不是事後依事件種類排序。登入、登出本身不輸出，但 Bot 仍接收其事件；`[end]` 是 EndHandler 回報 AppDriver 停止讀取的控制訊號，不發布網域事件。
 
@@ -27,7 +27,7 @@ stdin → main() → AppDriver.run() → parseLine() → ParsedEvent
 | --- | --- | --- |
 | `Client`（`main()`） | 放置 CLI 入口，將 stdin 一次讀入、交給應用服務，最後將結果印到 stdout。 | README 要文字逐行輸入／輸出；CLI 的 I/O 不應混進 Bot 的狀態邏輯；一次讀入並以 `print()` 印出可維持入口簡單，但在全部輸入讀完前不會即時寫出。它是函式而非實際的 `Client` 類別。 |
 | `AppDriver` | 協調「一行輸入 → 解析 → 交給責任鏈 → 收集輸出」；不再存放事件分派表或執行各事件的社群操作。 | CLI 的讀取與結束時機要一致；透過可替換的鏈根節點讓新增 handler 不必改 driver。事件操作改由各 concrete handler 依賴 `WaterCommunity` 和 `BotFacade`，仍不碰私有頻道。 |
-| `HandlerContext`、`EventHandler` 與組裝函式 | 共享社群、Bot、輸出狀態；以 `forward()` 串起節點，並在一處組裝預設鏈。 | 接手者只處理一件事，不符合時沿鏈轉交；鏈尾保證已解析請求有節點接住，但不等於輸入一定有效。預設仍靜默略過未知／啟動前事件，符合既有行為；新增事件只須新增 handler 並在組裝處接線。 |
+| `HandlerContext`、`EventHandler` 與組裝函式 | 共享社群、Bot、輸出狀態；`EventHandler.handle()` 固定「判斷 → 執行或轉交」樣板流程，再由組裝函式串起節點。 | 新 handler 只宣告 `event_type` 與專屬 `execute()`；需特別判斷時覆寫 `can_handle()`。鏈尾保證已解析請求有節點接住，但不等於輸入一定有效；預設仍靜默略過未知／啟動前事件。 |
 | `EventLineParser`（`parseLine()`） | 把 CLI 行文法和應用動作分開，產生供分派使用的結構化事件。 | 多數行是 `[名稱] JSON`，但 `[n unit elapsed]` 及 `[end]` 是特例；無狀態解析適合純函式。空行／找不到 `]` 時回 `None`，但無效 JSON、畸形 elapsed 與必要欄位不全並沒有完整錯誤復原／驗證。 |
 | `ParsedEvent` | 用 enum `name`、`payload` 明確表示解析結果，讓 driver 和責任鏈不再重複切字串；未知名稱另存於 `rawName`。 | 簡化分派介面與測試；使用一般 `dict` 保持各種事件 payload 的彈性，代價是欄位正確性目前由 handler 在執行時承擔。 |
 | `TranscriptObserver` | 獨立負責 README 要求的文字輸出；透過既有的 `CommunityObserver` 訂閱事件，不把格式化責任塞進 Bot 或各社群頻道。 | 同一事件既要讓 Bot 回應、又要記錄；Observer 可平行訂閱且保留同步發生順序。只輸出 README 定義的事件：登入／登出與成員留言不輸出；使用 `BOT_ID` 區分成員／Bot 版式。代價是依賴事件帶齊輸出資料（如 `CommentAddedEvent.postId`），並共享可變 `output` 串列。 |
@@ -45,7 +45,7 @@ stdin → main() → AppDriver.run() → parseLine() → ParsedEvent
 | `AppDriver.run(lines)` | `main()` 或測試／其他呼叫端送入輸入行時。 | 依序呼叫 `parseLine(rawLine)`；忽略回傳 `None` 的行，其餘送進 `_handler_chain.handle(parsed, context)`；收到 `HandlingResult.STOP` 即停止並回傳累積 `output`。同一 driver 重複 `run()` 會沿用既有狀態／輸出。 |
 | `parseLine(rawLine)` | `run()` 每讀取一行時。 | 去頭尾空白；空行回 `None`；`[end]` 回 `ParsedEvent(InputEventType.END, {})`；`[n unit elapsed]` 解析為 `ParsedEvent(InputEventType.ELAPSED, {"amount": int(n), "unit": unit})`；其他有 `]` 的行以 `]` 切名稱與後續 JSON（沒有 JSON 則 `{}`），將已知名稱轉為 enum，未知名稱轉成 `UNKNOWN` 並保存 `rawName`；沒有 `]` 回 `None`。不是驗證 README 全部欄位的 schema parser。 |
 | `ParsedEvent(name, payload)` | 由 `parseLine()` 建立。 | 保存 enum 事件種類與資料，交給責任鏈逐節點判斷；自身不發布事件也不執行社群操作。 |
-| `build_handler_chain()`／`EventHandler.forward()` | driver 建構預設鏈時／節點判斷自己不處理該請求時。 | 前者由鏈尾往前建立各事件 handler；後者轉交 `_next_handler.handle(request, context)`。沒有鏈尾且還要求轉交時會明確拋出錯誤。 |
+| `build_handler_chain()`／`EventHandler.handle()` | driver 建構預設鏈時／driver 或前一節點將請求交給 handler 時。 | 前者由鏈尾往前建立各事件 handler；後者固定呼叫 `can_handle()`，符合就呼叫 `execute()`，否則 `forward()` 至 `_next_handler.handle()`。沒有鏈尾且仍要求轉交時會明確拋出錯誤。 |
 
 ## 十種輸入事件：觸發者與下游
 

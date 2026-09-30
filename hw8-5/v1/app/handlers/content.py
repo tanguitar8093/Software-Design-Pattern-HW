@@ -5,9 +5,9 @@ from .base import EventHandler, HandlingResult
 
 
 class NewMessageHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.NEW_MESSAGE:
-            return self.forward(request, context)
+    event_type = InputEventType.NEW_MESSAGE
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         if context.community is not None:
             payload = request.payload
             context.community.postMessage(str(payload["authorId"]), payload.get("content", ""), payload.get("tags", []))
@@ -15,9 +15,9 @@ class NewMessageHandler(EventHandler):
 
 
 class NewPostHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.NEW_POST:
-            return self.forward(request, context)
+    event_type = InputEventType.NEW_POST
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         if context.community is not None:
             payload = request.payload
             context.community.createPost(

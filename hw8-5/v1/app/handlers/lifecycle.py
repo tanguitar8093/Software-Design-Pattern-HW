@@ -13,9 +13,9 @@ START_TIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
 
 
 class StartedHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.STARTED:
-            return self.forward(request, context)
+    event_type = InputEventType.STARTED
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         payload = request.payload
         quota = payload.get("quota")
         if type(quota) is not int or quota <= 0:
@@ -30,14 +30,17 @@ class StartedHandler(EventHandler):
 
 
 class EndHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.END:
-            return self.forward(request, context)
+    event_type = InputEventType.END
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         return HandlingResult.STOP
 
 
 class UnknownEventHandler(EventHandler):
     """鏈尾：保留原有未知事件靜默略過的行為。"""
 
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
+    def can_handle(self, request: ParsedEvent) -> bool:
+        return True
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         return HandlingResult.CONTINUE

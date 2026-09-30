@@ -17,15 +17,19 @@ class TrackingTerminal(EventHandler):
         super().__init__()
         self.requests: list[ParsedEvent] = []
 
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
+    def can_handle(self, request: ParsedEvent) -> bool:
+        return True
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         self.requests.append(request)
         return HandlingResult.CONTINUE
 
 
 class FutureEventHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.UNKNOWN or request.rawName != "future event":
-            return self.forward(request, context)
+    def can_handle(self, request: ParsedEvent) -> bool:
+        return request.name is InputEventType.UNKNOWN and request.rawName == "future event"
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         context.output.append("future event handled")
         return HandlingResult.CONTINUE
 
@@ -48,6 +52,20 @@ class HandlerChainTest(unittest.TestCase):
 
         self.assertIs(result, HandlingResult.CONTINUE)
         self.assertEqual(community.getOnlineCount(), 1)
+        self.assertEqual(terminal.requests, [])
+
+    def test_unmatched_request_without_next_handler_fails_loudly(self) -> None:
+        request = ParsedEvent(InputEventType.UNKNOWN, {}, rawName="future event")
+
+        with self.assertRaisesRegex(RuntimeError, "no terminal handler"):
+            LoginHandler().handle(request, HandlerContext([]))
+
+    def test_matched_request_before_start_is_consumed_without_forwarding(self) -> None:
+        terminal = TrackingTerminal()
+
+        result = LoginHandler(terminal).handle(ParsedEvent(InputEventType.LOGIN, {}), HandlerContext([]))
+
+        self.assertIs(result, HandlingResult.CONTINUE)
         self.assertEqual(terminal.requests, [])
 
     def test_end_handler_stops_without_forwarding(self) -> None:

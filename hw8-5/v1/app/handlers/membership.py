@@ -6,9 +6,9 @@ from .base import EventHandler, HandlingResult
 
 
 class LoginHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.LOGIN:
-            return self.forward(request, context)
+    event_type = InputEventType.LOGIN
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         if context.community is not None:
             payload = request.payload
             role = Role.ADMIN if payload.get("isAdmin", False) else Role.MEMBER
@@ -17,9 +17,9 @@ class LoginHandler(EventHandler):
 
 
 class LogoutHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.LOGOUT:
-            return self.forward(request, context)
+    event_type = InputEventType.LOGOUT
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         if context.community is not None:
             context.community.logout(str(request.payload["userId"]))
         return HandlingResult.CONTINUE

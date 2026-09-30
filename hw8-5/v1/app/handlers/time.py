@@ -5,9 +5,9 @@ from .base import EventHandler, HandlingResult
 
 
 class ElapsedHandler(EventHandler):
-    def handle(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
-        if request.name is not InputEventType.ELAPSED:
-            return self.forward(request, context)
+    event_type = InputEventType.ELAPSED
+
+    def execute(self, request: ParsedEvent, context: HandlerContext) -> HandlingResult:
         if context.community is not None:
             context.community.elapseTime(request.payload["amount"], request.payload["unit"])
         return HandlingResult.CONTINUE
