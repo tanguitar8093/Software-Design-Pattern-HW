@@ -1,0 +1,109 @@
+classDiagram
+    direction LR
+
+    %% v4-9：沿用 v4-8 App 責任鏈，只更新 Bot 收到網域事件後的 v2 原地反應設計。
+    %% main()、parseLine()、build_handler_chain() 是模組函式，不另畫成類別。
+    %% 具體操作與網域事件見 oodv4-9-app-runtime.mmd；差異見 oodv4-9-app-diff.md。
+
+    class AppDriver {
+        -_context: HandlerContext
+        -_handler_chain: EventHandler
+        +run(lines: list~str~) list~str~
+    }
+    class ParsedEvent {
+        +name: InputEventType
+        +payload: dict
+        +rawName: str|None
+    }
+    class HandlerContext {
+        +output: list~str~
+        +community: WaterCommunity|None
+        +bot: Bot|None
+    }
+    class EventHandler {
+        <<abstract>>
+        -_next_handler: EventHandler|None
+        +handle(request: ParsedEvent, context: HandlerContext) HandlingResult
+        +can_handle(request: ParsedEvent) bool
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class LifecycleHandler {
+        +event_types: frozenset
+    }
+    class MembershipHandler {
+        +event_types: frozenset
+    }
+    class ActivityHandler {
+        +event_types: frozenset
+    }
+    class UnknownEventHandler {
+        <<terminal>>
+    }
+    class TranscriptObserver {
+        +onEvent(event: DomainEvent) void
+    }
+    class CommunityObserver {
+        <<interface>>
+        +onEvent(event: DomainEvent) void
+    }
+    class WaterCommunity {
+        +getEventPublisher() EventPublisher
+    }
+    class EventPublisher {
+        +register(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+    class BotFacade {
+        +__init__(community: WaterCommunity, quota: int)
+    }
+    class Bot {
+        <<CommunityObserver>>
+        +rootFsm: FiniteStateMachine
+        +onEvent(event: DomainEvent) void
+    }
+    class StateNode {
+        <<abstract>>
+        +fire(event: Event) bool
+    }
+    class FiniteStateMachine {
+        +currentState: StateNode|None
+        +fire(event: Event) bool
+    }
+    class State {
+        +fire(event: Event) bool
+    }
+    class DefaultConversationState
+    class InteractingState
+    class RecordingState
+    class QuestioningState
+
+    AppDriver *-- HandlerContext : 持有執行狀態
+    AppDriver --> EventHandler : 持有鏈首
+    AppDriver ..> ParsedEvent : parseLine(rawLine) 建立
+    EventHandler --> "0..1" EventHandler : next（不匹配則轉交）
+    EventHandler ..> ParsedEvent : can_handle
+    EventHandler ..> HandlerContext : execute
+    EventHandler <|-- LifecycleHandler
+    EventHandler <|-- MembershipHandler
+    EventHandler <|-- ActivityHandler
+    EventHandler <|-- UnknownEventHandler
+    LifecycleHandler ..> WaterCommunity : started 建立
+    LifecycleHandler ..> BotFacade : started 建立
+    LifecycleHandler ..> TranscriptObserver : started 註冊
+    MembershipHandler ..> WaterCommunity : login/logout
+    ActivityHandler ..> WaterCommunity : 時間／內容／廣播操作
+    BotFacade --> Bot : 建立
+    WaterCommunity *-- EventPublisher : 擁有
+    EventPublisher o-- "0..*" CommunityObserver : 訂閱者
+    TranscriptObserver ..|> CommunityObserver
+    Bot ..|> CommunityObserver
+    Bot *-- FiniteStateMachine : rootFsm / onEvent 呼叫 fire
+    FiniteStateMachine --|> StateNode
+    State --|> StateNode
+    FiniteStateMachine --> StateNode : currentState / 先呼叫 fire
+    State <|-- DefaultConversationState
+    State <|-- InteractingState
+    State <|-- RecordingState
+    State <|-- QuestioningState
+    BotFacade ..> State : 為各狀態接上動作
+    note for State "四種狀態覆寫 fire：符合條件就執行原地動作，仍回傳 False，讓 FSM 繼續檢查轉移"

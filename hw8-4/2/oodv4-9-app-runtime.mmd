@@ -1,0 +1,272 @@
+classDiagram
+    direction LR
+
+    %% v4-9：v4-8 App 層結構不變；Bot / FSM / State 區塊對照 hw8-5/v2。
+    %% 入口 main() → AppDriver.run() → parseLine() → EventHandler.handle()。
+    %% N58~N63 見 oodv4-4-notes.md；簡圖見 oodv4-9-app-overview.mmd；差異見 oodv4-9-app-diff.md。
+
+    class ParsedEvent {
+        +name: InputEventType
+        +payload: dict
+        +rawName: str|None
+    }
+    class InputEventType {
+        <<enumeration>>
+        STARTED
+        LOGIN
+        LOGOUT
+        ELAPSED
+        NEW_MESSAGE
+        NEW_POST
+        GO_BROADCASTING
+        SPEAK
+        STOP_BROADCASTING
+        END
+        UNKNOWN
+    }
+    class AppDriver {
+        -_context: HandlerContext
+        -_handler_chain: EventHandler
+        +output: list~str~
+        +community: WaterCommunity|None
+        +bot: Bot|None
+        +run(lines: list~str~) list~str~
+    }
+    class HandlerContext {
+        +output: list~str~
+        +community: WaterCommunity|None
+        +bot: Bot|None
+    }
+    class HandlingResult {
+        <<enumeration>>
+        CONTINUE
+        STOP
+    }
+    class EventHandler {
+        <<abstract>>
+        +event_types: frozenset~InputEventType~
+        -_next_handler: EventHandler|None
+        +handle(request: ParsedEvent, context: HandlerContext) HandlingResult
+        +can_handle(request: ParsedEvent) bool
+        +forward(request: ParsedEvent, context: HandlerContext) HandlingResult
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class LifecycleHandler {
+        +event_types: STARTED, END
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class MembershipHandler {
+        +event_types: LOGIN, LOGOUT
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class ActivityHandler {
+        +event_types: ELAPSED, NEW_MESSAGE, NEW_POST, GO_BROADCASTING, SPEAK, STOP_BROADCASTING
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class UnknownEventHandler {
+        +can_handle(request: ParsedEvent) bool
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class TranscriptObserver {
+        -output: list~str~
+        +getId() str
+        +onEvent(event: DomainEvent) void
+        -_format(event: DomainEvent) str|None
+    }
+    class CommunityObserver {
+        <<interface>>
+        +getId() str
+        +onEvent(event: DomainEvent) void
+    }
+    class DomainEvent {
+        <<interface>>
+        +getSourceId() str|None
+    }
+    class TimeElapsedEvent
+    class MessagePostedEvent
+    class PostCreatedEvent
+    class CommentAddedEvent {
+        +postId: str
+        +comment: Comment
+    }
+    class BroadcastStartedEvent
+    class VoiceSpokenEvent
+    class BroadcastStoppedEvent
+    class EventPublisher {
+        +register(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+    class WaterCommunity {
+        +login(participant: Participant) void
+        +logout(participantId: str) void
+        +elapseTime(amount: int, unit: str) void
+        +postMessage(authorId: str, content: str, tags: list~str~) void
+        +createPost(id: str, authorId: str, title: str, content: str, tags: list~str~) void
+        +addComment(postId: str, authorId: str, content: str, tags: list~str~) void
+        +startBroadcast(speakerId: str) void
+        +speak(speakerId: str, content: str) void
+        +stopBroadcast(speakerId: str) void
+        +getEventPublisher() EventPublisher
+    }
+    class Member {
+        -id: str
+        -role: Role
+    }
+    class Role {
+        <<enumeration>>
+        ADMIN
+        MEMBER
+    }
+    class BotFacade {
+        -bot: Bot
+        +__init__(community: WaterCommunity, quota: int)
+    }
+    class Bot {
+        <<CommunityObserver>>
+        +quota: int
+        +rootFsm: FiniteStateMachine
+        +onEvent(event: DomainEvent) void
+    }
+    class StateNode {
+        <<abstract>>
+        +fire(event: Event) bool
+    }
+    class FiniteStateMachine {
+        +currentState: StateNode|None
+        +fire(event: Event) bool
+    }
+    class State {
+        +enter: Action
+        +exit: Action
+        +fire(event: Event) bool
+    }
+    class WaitingState
+    class ThanksForJoiningState
+    class DefaultConversationState {
+        +messageAction: Action|None
+        +postAction: Action|None
+        +fire(event: Event) bool
+    }
+    class InteractingState {
+        +messageAction: Action|None
+        +postAction: Action|None
+        +fire(event: Event) bool
+    }
+    class RecordingState {
+        +voiceAction: Action|None
+        +fire(event: Event) bool
+    }
+    class QuestioningState {
+        +answerCorrectGuard: Guard|None
+        +lastQuestionGuard: Guard|None
+        +correctAnswerAction: Action|None
+        +fire(event: Event) bool
+    }
+    class Trigger {
+        <<abstract>>
+        +isTriggeredBy(event: Event) bool
+    }
+    class Guard {
+        <<abstract>>
+        +isSatisfied(event: Event) bool
+    }
+    class Action {
+        <<abstract>>
+        +execute(event: Event) void
+    }
+    class MessageFromMemberTrigger
+    class PostCreatedTrigger
+    class VoiceSpokenTrigger
+    class MentionsBotTrigger
+    class AnswerCorrectGuard
+    class LastQuestionGuard
+    class SendChatMessageAction
+    class CommentPostAction
+    class AddVoiceToRecordingSessionAction
+    class CompositeAction
+
+    AppDriver *-- HandlerContext : 持有執行狀態
+    AppDriver --> EventHandler : 鏈首（可注入）
+    AppDriver ..> ParsedEvent : parseLine(rawLine) 建立
+    ParsedEvent --> InputEventType : name
+    EventHandler --> "0..1" EventHandler : next
+    EventHandler ..> ParsedEvent : can_handle(request)
+    EventHandler ..> HandlerContext : execute(request, context)
+    EventHandler ..> HandlingResult : 回傳
+    EventHandler <|-- LifecycleHandler
+    EventHandler <|-- MembershipHandler
+    EventHandler <|-- ActivityHandler
+    EventHandler <|-- UnknownEventHandler
+    LifecycleHandler ..> WaterCommunity : STARTED 建立
+    LifecycleHandler ..> TranscriptObserver : 先註冊
+    LifecycleHandler ..> BotFacade : 後建立 Bot
+    MembershipHandler ..> Member : LOGIN 建立
+    MembershipHandler ..> WaterCommunity : login/logout
+    ActivityHandler ..> WaterCommunity : 時間／內容／廣播操作
+    Member --> Role : role
+    BotFacade --> Bot : 建立
+    Bot *-- FiniteStateMachine : rootFsm / onEvent 委託 fire
+    StateNode <|-- FiniteStateMachine
+    StateNode <|-- State
+    FiniteStateMachine --> StateNode : currentState / 先呼叫 fire
+    State <|-- DefaultConversationState
+    State <|-- InteractingState
+    State <|-- WaitingState
+    State <|-- RecordingState
+    State <|-- QuestioningState
+    State <|-- ThanksForJoiningState
+    BotFacade ..> DefaultConversationState : 設定 messageAction / postAction
+    BotFacade ..> InteractingState : 設定 messageAction / postAction
+    BotFacade ..> RecordingState : 設定 voiceAction
+    BotFacade ..> QuestioningState : 設定 guards / correctAnswerAction
+    Trigger <|-- MessageFromMemberTrigger
+    Trigger <|-- PostCreatedTrigger
+    Trigger <|-- VoiceSpokenTrigger
+    Trigger <|-- MentionsBotTrigger
+    Guard <|-- AnswerCorrectGuard
+    Guard <|-- LastQuestionGuard
+    Action <|-- SendChatMessageAction
+    Action <|-- CommentPostAction
+    Action <|-- AddVoiceToRecordingSessionAction
+    Action <|-- CompositeAction
+    DefaultConversationState ..> MessageFromMemberTrigger : fire 檢查
+    DefaultConversationState ..> PostCreatedTrigger : fire 檢查
+    InteractingState ..> MessageFromMemberTrigger : fire 檢查
+    InteractingState ..> PostCreatedTrigger : fire 檢查
+    RecordingState ..> VoiceSpokenTrigger : fire 檢查
+    QuestioningState ..> MentionsBotTrigger : fire 檢查
+    QuestioningState --> AnswerCorrectGuard : answerCorrectGuard
+    QuestioningState --> LastQuestionGuard : lastQuestionGuard
+    DefaultConversationState --> Action : messageAction / postAction
+    InteractingState --> Action : messageAction / postAction
+    RecordingState --> Action : voiceAction
+    QuestioningState --> Action : correctAnswerAction
+    WaterCommunity *-- EventPublisher : 擁有
+    EventPublisher o-- "0..*" CommunityObserver : observers
+    EventPublisher ..> DomainEvent : notify(event)
+    CommunityObserver <|.. TranscriptObserver
+    CommunityObserver <|.. Bot
+    DomainEvent <|.. TimeElapsedEvent
+    DomainEvent <|.. MessagePostedEvent
+    DomainEvent <|.. PostCreatedEvent
+    DomainEvent <|.. CommentAddedEvent
+    DomainEvent <|.. BroadcastStartedEvent
+    DomainEvent <|.. VoiceSpokenEvent
+    DomainEvent <|.. BroadcastStoppedEvent
+    TranscriptObserver ..> TimeElapsedEvent : 格式化
+    TranscriptObserver ..> MessagePostedEvent : 格式化
+    TranscriptObserver ..> PostCreatedEvent : 格式化
+    TranscriptObserver ..> CommentAddedEvent : 格式化
+    TranscriptObserver ..> BroadcastStartedEvent : 格式化
+    TranscriptObserver ..> VoiceSpokenEvent : 格式化
+    TranscriptObserver ..> BroadcastStoppedEvent : 格式化
+
+    note for AppDriver "N58"
+    note for EventHandler "N59"
+    note for ParsedEvent "N60"
+    note for TranscriptObserver "N61"
+    note for WaterCommunity "N62"
+    note for CommentAddedEvent "N63"
+    note for Bot "v2 只呼叫 rootFsm.fire；原地反應不在 Bot 中判斷或執行"
+    note for State "四種狀態的 fire 執行原地 Action 後回傳 False；未覆寫的狀態沿用 State.fire 的 False"
+    note for FiniteStateMachine "先呼叫目前子狀態的 fire；回傳 False 才檢查本層轉移"
