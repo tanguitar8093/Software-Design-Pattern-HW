@@ -40,7 +40,7 @@ class FlushRecordReplayAction(Action):
         if self.recordingState.session is None:
             return
         replay = self.recordingState.session.generateReplay()
-        self.bot.replyChatMessage(f"[Record Replay] {replay}", [self.bot.recorderId])
+        self.bot.replyChatMessage(replay, [self.bot.recorderId])
         self.recordingState.session = None
 
 

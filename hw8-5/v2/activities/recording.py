@@ -10,4 +10,4 @@ class RecordingSession:
         self._voices.append(message)
 
     def generateReplay(self) -> str:
-        return "\n".join(voice.content for voice in self._voices)
+        return "[Record Replay] " + "\n".join(voice.content for voice in self._voices)
