@@ -128,7 +128,7 @@ class BotFacade:
                 ),
             ],
         )
-        knowledgeKingFsm.addTransition(
+        rootFsm.addTransition(
             Transition(
                 from_=knowledgeKingFsm,
                 trigger=CommandTrigger("play again"),
@@ -142,7 +142,7 @@ class BotFacade:
                     ]
                 ),
             )
-        )  # self-loop：composite 自己轉移到自己，onExit/onEnter 會重新跑，符合「再玩一次」要整個重置的需求
+        )  # root 的自迴圈：離開目前子狀態，再進入知識王的 Questioning
 
         rootInitialStateSelector.fallback = normalFsm  # 建構順序限制：rootFsm 早於 normalFsm 存在，事後補上真正的初始子狀態
         rootFsm.addTransition(
