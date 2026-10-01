@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 520" role="img" aria-labelledby="title description">
+  <title id="title">InternalReaction 套用前的概念 UML</title>
+  <desc id="description">只有 Bot 類別；原地反應的判斷和執行寫在 Bot.onEvent 中，旁邊有虛擬碼便條紙。</desc>
+  <rect width="1080" height="520" fill="#fafbfc"/>
+  <text x="48" y="65" font-size="31" font-weight="700" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">套用前：Bot 自己處理原地反應</text>
+  <text x="48" y="98" font-size="18" fill="#596779" font-family="Noto Sans CJK TC, sans-serif">概念示意：不是宣稱這是專案曾經存在的程式版本</text>
+
+  <rect x="70" y="185" width="345" height="165" rx="3" fill="white" stroke="#304358" stroke-width="2"/>
+  <line x1="70" y1="246" x2="415" y2="246" stroke="#304358" stroke-width="2"/>
+  <text x="242" y="224" text-anchor="middle" font-size="27" font-weight="700" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">Bot</text>
+  <text x="95" y="296" font-size="22" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">+ onEvent(event)</text>
+
+  <line x1="415" y1="268" x2="525" y2="268" stroke="#76889c" stroke-width="2" stroke-dasharray="7 5"/>
+  <path d="M525 152 H954 L980 178 V410 H525 Z" fill="#fff9e8" stroke="#b4852d" stroke-width="2"/>
+  <path d="M954 152 V178 H980" fill="none" stroke="#b4852d" stroke-width="2"/>
+  <text x="550" y="201" font-size="21" font-weight="700" fill="#705019" font-family="Noto Sans CJK TC, sans-serif">虛擬碼便條紙</text>
+  <g font-size="20" fill="#263445" font-family="Noto Sans CJK TC, sans-serif">
+    <text x="550" y="247">onEvent(event):</text>
+    <text x="574" y="285">leaf = 取得目前最內層狀態</text>
+    <text x="574" y="323">若狀態、事件、限制條件皆符合:</text>
+    <text x="600" y="361">執行對應動作</text>
+    <text x="574" y="399">rootFsm.fire(event)</text>
+  </g>
+</svg>

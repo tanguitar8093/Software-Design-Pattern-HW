@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 750" role="img" aria-labelledby="title description">
+  <title id="title">InternalReaction 套用後的 UML</title>
+  <desc id="description">Bot 持有零到多個 InternalReaction；Bot 決定反應執行順序和 FSM 轉移，InternalReaction 判斷單一反應是否適用。兩個類別各有虛擬碼便條紙。</desc>
+  <rect width="1160" height="750" fill="#fafbfc"/>
+  <text x="48" y="65" font-size="31" font-weight="700" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">套用後：抽出 InternalReaction</text>
+  <text x="48" y="99" font-size="18" fill="#596779" font-family="Noto Sans CJK TC, sans-serif">Bot 安排執行順序；InternalReaction 判斷這條反應是否適用</text>
+
+  <rect x="80" y="155" width="395" height="174" rx="3" fill="white" stroke="#304358" stroke-width="2"/>
+  <line x1="80" y1="216" x2="475" y2="216" stroke="#304358" stroke-width="2"/>
+  <text x="278" y="194" text-anchor="middle" font-size="27" font-weight="700" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">Bot</text>
+  <text x="105" y="257" font-size="21" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">- internalReactions</text>
+  <text x="105" y="298" font-size="21" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">+ onEvent(event)</text>
+
+  <rect x="710" y="155" width="395" height="235" rx="3" fill="white" stroke="#304358" stroke-width="2"/>
+  <line x1="710" y1="216" x2="1105" y2="216" stroke="#304358" stroke-width="2"/>
+  <line x1="710" y1="329" x2="1105" y2="329" stroke="#304358" stroke-width="2"/>
+  <text x="907" y="194" text-anchor="middle" font-size="27" font-weight="700" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">InternalReaction</text>
+  <text x="735" y="257" font-size="21" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">+ state, trigger, guard, action</text>
+  <text x="735" y="370" font-size="20" fill="#202a36" font-family="Noto Sans CJK TC, sans-serif">+ isApplicable(leaf, event)</text>
+
+  <path d="M475 259 L499 246 L523 259 L499 272 Z" fill="#304358"/>
+  <line x1="523" y1="259" x2="710" y2="259" stroke="#304358" stroke-width="2"/>
+  <text x="535" y="238" font-size="18" fill="#354659" font-family="Noto Sans CJK TC, sans-serif">持有</text>
+  <text x="485" y="303" font-size="18" fill="#354659" font-family="Noto Sans CJK TC, sans-serif">1</text>
+  <text x="660" y="303" font-size="18" fill="#354659" font-family="Noto Sans CJK TC, sans-serif">0..*</text>
+
+  <line x1="278" y1="329" x2="278" y2="440" stroke="#76889c" stroke-width="2" stroke-dasharray="7 5"/>
+  <path d="M48 440 H524 L550 466 V715 H48 Z" fill="#fff9e8" stroke="#b4852d" stroke-width="2"/>
+  <path d="M524 440 V466 H550" fill="none" stroke="#b4852d" stroke-width="2"/>
+  <text x="75" y="485" font-size="21" font-weight="700" fill="#705019" font-family="Noto Sans CJK TC, sans-serif">Bot 的虛擬碼</text>
+  <g font-size="19" fill="#263445" font-family="Noto Sans CJK TC, sans-serif">
+    <text x="75" y="528">onEvent(event):</text>
+    <text x="96" y="567">leaf = 取得目前最內層狀態</text>
+    <text x="96" y="606">對每個 reaction:</text>
+    <text x="115" y="645">若 reaction.isApplicable(leaf, event):</text>
+    <text x="135" y="674">reaction.action.execute(event)</text>
+    <text x="96" y="702">rootFsm.fire(event)</text>
+  </g>
+
+  <line x1="907" y1="390" x2="907" y2="440" stroke="#76889c" stroke-width="2" stroke-dasharray="7 5"/>
+  <path d="M598 440 H1086 L1112 466 V715 H598 Z" fill="#fff9e8" stroke="#b4852d" stroke-width="2"/>
+  <path d="M1086 440 V466 H1112" fill="none" stroke="#b4852d" stroke-width="2"/>
+  <text x="625" y="485" font-size="21" font-weight="700" fill="#705019" font-family="Noto Sans CJK TC, sans-serif">InternalReaction 的虛擬碼</text>
+  <g font-size="19" fill="#263445" font-family="Noto Sans CJK TC, sans-serif">
+    <text x="625" y="528">isApplicable(leaf, event):</text>
+    <text x="646" y="567">若 leaf 不是 state: 回傳 false</text>
+    <text x="646" y="606">若 trigger 不符合: 回傳 false</text>
+    <text x="646" y="645">若 guard 存在且不通過:</text>
+    <text x="669" y="674">回傳 false</text>
+    <text x="646" y="702">回傳 true</text>
+  </g>
+</svg>
