@@ -1,0 +1,97 @@
+classDiagram
+    direction LR
+
+    %% 最新 App 層總覽：對照 hw8-5/v1/app（責任鏈 + 樣板方法版）。
+    %% 完整類別、各事件 handler 及網域事件依賴，見 oodv4-9-app-runtime.mmd。
+    %% Client、EventLineParser、HandlerChainBuilder 是模組函式的圖面名稱，不是實際 Python 類別。
+
+    class Client {
+        <<CLI / main.py>>
+        +main() void
+    }
+    class AppDriver {
+        <<Application Driver>>
+        +run(lines: list~str~) list~str~
+    }
+    class EventLineParser {
+        <<module function>>
+        +parseLine(rawLine: str) ParsedEvent|None
+    }
+    class ParsedEvent {
+        +name: InputEventType
+        +payload: dict
+        +rawName: str|None
+    }
+    class InputEventType {
+        <<enumeration>>
+    }
+    class HandlerContext {
+        +output: list~str~
+        +community: WaterCommunity|None
+        +bot: Bot|None
+    }
+    class HandlerChainBuilder {
+        <<module function>>
+        +build_handler_chain() EventHandler
+    }
+    class EventHandler {
+        <<abstract / Template Method>>
+        +handle(request: ParsedEvent, context: HandlerContext) HandlingResult
+        +can_handle(request: ParsedEvent) bool
+        +execute(request: ParsedEvent, context: HandlerContext) HandlingResult
+    }
+    class StartedHandler
+    class EndHandler
+    class UnknownEventHandler
+    class HandlingResult {
+        <<enumeration>>
+        CONTINUE
+        STOP
+    }
+    class TranscriptObserver {
+        <<CommunityObserver>>
+        +onEvent(event: DomainEvent) void
+    }
+    class CommunityObserver {
+        <<interface>>
+        +onEvent(event: DomainEvent) void
+    }
+    class WaterCommunity
+    class BotFacade
+    class Bot {
+        <<CommunityObserver>>
+        +onEvent(event: DomainEvent) void
+    }
+    class EventPublisher {
+        +register(observer: CommunityObserver) void
+        +notify(event: DomainEvent) void
+    }
+    class DomainEvent
+
+    Client ..> AppDriver : run(stdin lines)
+    AppDriver ..> EventLineParser : parseLine(rawLine)
+    EventLineParser ..> ParsedEvent : returns
+    ParsedEvent --> InputEventType : name
+    AppDriver *-- HandlerContext : _context
+    AppDriver --> EventHandler : _handler_chain / inject or build
+    AppDriver ..> HandlerChainBuilder : default chain
+    HandlerChainBuilder ..> EventHandler : assembles nodes
+    EventHandler --> EventHandler : _next_handler / forward
+    EventHandler ..> HandlingResult : handle / execute
+    EventHandler <|-- StartedHandler
+    EventHandler <|-- EndHandler
+    EventHandler <|-- UnknownEventHandler
+    %% Login、Logout、Elapsed、NewMessage、NewPost、GoBroadcasting、Speak、StopBroadcasting
+    %% 八個具體 Handler 的繼承與依賴在 detail 圖展開。
+
+    HandlerContext --> WaterCommunity : current community
+    HandlerContext --> Bot : current bot
+    StartedHandler ..> WaterCommunity : creates
+    StartedHandler ..> TranscriptObserver : creates and registers first
+    StartedHandler ..> BotFacade : creates bot second
+    BotFacade --> Bot : builds and registers
+    WaterCommunity *-- EventPublisher : owns
+    EventPublisher o-- CommunityObserver : synchronous subscribers
+    EventPublisher ..> DomainEvent : notify(event)
+    CommunityObserver <|.. TranscriptObserver
+    CommunityObserver <|.. Bot
