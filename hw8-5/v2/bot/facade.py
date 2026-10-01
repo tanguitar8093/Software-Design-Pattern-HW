@@ -255,20 +255,23 @@ class BotFacade:
         return [
             Question(
                 0,
-                "請問哪個 SQL 語句用於選擇所有的行？(A) SELECT * (B) SELECT ALL (C) SELECT ROWS (D) SELECT DATA",
+                "請問哪個 SQL 語句用於選擇所有的行？\n"
+                "A) SELECT *\nB) SELECT ALL\nC) SELECT ROWS\nD) SELECT DATA",
                 ["A", "B", "C", "D"],
                 "A",
             ),
             Question(
                 1,
-                "請問哪個 CSS 屬性可用於設置文字的顏色？(A) text-align (B) font-size (C) color (D) padding",
+                "請問哪個 CSS 屬性可用於設置文字的顏色？\n"
+                "A) text-align\nB) font-size\nC) color\nD) padding",
                 ["A", "B", "C", "D"],
                 "C",
             ),
             Question(
                 2,
-                "請問在計算機科學中，「XML」代表什麼？(A) Extensible Markup Language (B) Extensible Modeling Language "
-                "(C) Extended Markup Language (D) Extended Modeling Language",
+                "請問在計算機科學中，「XML」代表什麼？\n"
+                "A) Extensible Markup Language\nB) Extensible Modeling Language\n"
+                "C) Extended Markup Language\nD) Extended Modeling Language",
                 ["A", "B", "C", "D"],
                 "A",
             ),

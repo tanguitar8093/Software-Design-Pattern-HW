@@ -43,6 +43,12 @@ class Bot(CommunityObserver):
     def broadcastVoice(self, content: str) -> None:
         self._community.postBotVoice(content)
 
+    def startBroadcast(self) -> None:
+        self._community.startBroadcast(self.id)
+
+    def stopBroadcast(self) -> None:
+        self._community.stopBroadcast(self.id)
+
     def getOnlineCount(self) -> int:
         return self._community.getOnlineCount() + 1  # 在線人數計算包含機器人自己（README 明定）
 

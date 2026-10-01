@@ -39,7 +39,8 @@ class FlushRecordReplayAction(Action):
     def execute(self, event: Event) -> None:
         if self.recordingState.session is None:
             return
-        self.bot.replyChatMessage(self.recordingState.session.generateReplay(), [self.bot.recorderId])
+        replay = self.recordingState.session.generateReplay()
+        self.bot.replyChatMessage(f"[Record Replay] {replay}", [self.bot.recorderId])
         self.recordingState.session = None
 
 
@@ -137,7 +138,9 @@ class AnnounceGameResultAction(Action):
         if self.bot.isBroadcasting():
             self.bot.replyChatMessage(text, [])
         else:
+            self.bot.startBroadcast()
             self.bot.broadcastVoice(text)
+            self.bot.stopBroadcast()
         self.thanksForJoiningState.enteredAt = self.bot.getCurrentTime()
 
 

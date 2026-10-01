@@ -77,7 +77,7 @@ class AppDriverTest(unittest.TestCase):
         )
         assert driver.bot is not None
         self.assertEqual(driver.bot.quota, 17)
-        self.assertIn("🤖: line one\nline two @1", driver.output)
+        self.assertIn("🤖: [Record Replay] line one\nline two @1", driver.output)
 
     def test_king_flow_reaches_thanks_for_joining_with_winner(self) -> None:
         driver = self._start(quota=20)
@@ -92,7 +92,29 @@ class AppDriverTest(unittest.TestCase):
         )
         self.assertIn("🤖: KnowledgeKing is started!", driver.output)
         self.assertEqual(driver.output.count("🤖: Congrats! you got the answer! @1"), 3)
-        self.assertIn("🤖 speaking: The winner is 1", driver.output)
+        self.assertEqual(
+            driver.output[-3:],
+            ["🤖 go broadcasting...", "🤖 speaking: The winner is 1", "🤖 stop broadcasting..."],
+        )
+        assert driver.community is not None
+        self.assertFalse(driver.community.isBroadcasting())
+
+    def test_king_result_uses_chat_when_someone_is_broadcasting(self) -> None:
+        driver = self._start()
+        driver.run(
+            [
+                '[login] {"userId": "1", "isAdmin": true}',
+                '[new message] {"authorId": "1", "content": "king", "tags": ["bot"]}',
+                '[go broadcasting] {"speakerId": "1"}',
+                '[new message] {"authorId": "1", "content": "A", "tags": ["bot"]}',
+                '[new message] {"authorId": "1", "content": "C", "tags": ["bot"]}',
+                '[new message] {"authorId": "1", "content": "A", "tags": ["bot"]}',
+            ]
+        )
+        self.assertEqual(driver.output[-1], "🤖: The winner is 1")
+        assert driver.community is not None
+        self.assertTrue(driver.community.isBroadcasting())
+        self.assertNotIn("🤖 go broadcasting...", driver.output)
 
     def test_new_post_and_bot_comment_are_recorded(self) -> None:
         driver = self._start()
