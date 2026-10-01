@@ -1,4 +1,9 @@
 import sys
+from pathlib import Path
+
+# 直接執行入口檔時，讓 Python 能找到 hw8-5 下的版本套件。
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from v1.app.driver import AppDriver
 
