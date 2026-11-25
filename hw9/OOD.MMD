@@ -1,0 +1,148 @@
+classDiagram
+    direction TB
+    class GeneticAlgorithm~G~ {
+        <<abstract>>
+        -problem : GeneticProblem~G~
+        -selection : Selection~G~
+        -config : GAConfig
+        #random : Random
+        +solve() Optional~Individual~
+        #createIndividual() Individual~G~
+        -initializePopulation() Population~G~
+        -reproduce(population) Population~G~
+        -findBest(population) Optional~Individual~
+    }
+    class SchedulingGA {
+        #createIndividual() Individual~ProductionProduct~
+    }
+    class RecommendationGA {
+        #createIndividual() Individual~Product~
+    }
+    class GeneticProblem~G~ {
+        <<interface>>
+        +evaluate(individual) Fitness
+        +crossover(first, second, random) Individual~G~
+        +mutate(individual, random) Individual~G~
+    }
+    class Selection~G~ {
+        <<interface>>
+        +select(population, problem, random) Individual~G~
+    }
+    class TournamentSelection~G~ {
+        +select(population, problem, random) Individual~G~
+    }
+    class Population~G~ {
+        -individuals : List~Individual~
+        +individuals() List~Individual~
+    }
+    class Individual~G~ {
+        -chromosome : Chromosome~G~
+        +chromosome() Chromosome~G~
+    }
+    class Chromosome~G~ {
+        -genes : List~G~
+        +genes() List~G~
+    }
+    class Fitness {
+        +feasible : boolean
+        +score : double
+        +compareTo(other) int
+    }
+    class GAConfig {
+        +populationSize : int
+        +maxIterations : int
+        +crossoverRate : double
+        +mutationRate : double
+    }
+    class SchedulingProblem {
+        -demands : List~ProductionDemand~
+        -machines : List~Machine~
+        -workers : List~Worker~
+        +createIndividual(random) Individual~ProductionProduct~
+        +evaluate(individual) Fitness
+        +crossover(first, second, random) Individual~ProductionProduct~
+        +mutate(individual, random) Individual~ProductionProduct~
+        +decode(individual) Schedule
+    }
+    class RecommendationProblem {
+        -products : List~Product~
+        -budget : int
+        -capacity : int
+        -preferences : Map~Category_double~
+        +createIndividual(random) Individual~Product~
+        +evaluate(individual) Fitness
+        +crossover(first, second, random) Individual~Product~
+        +mutate(individual, random) Individual~Product~
+    }
+    class ProductionDemand {
+        +product : ProductionProduct
+        +quantity : int
+    }
+    class ProductionProduct {
+        +id : String
+        +durationHours : int
+    }
+    class Machine {
+        +id : String
+    }
+    class Worker {
+        +id : String
+    }
+    class Schedule {
+        +tasks : List~ProductionTask~
+        +completionHours : int
+    }
+    class ProductionTask {
+        +product : ProductionProduct
+        +machine : Machine
+        +worker : Worker
+        +startHour : int
+        +endHour : int
+    }
+    class Product {
+        +id : String
+        +price : int
+        +weight : int
+        +category : Category
+    }
+    class Category {
+        <<enumeration>>
+        A
+        B
+        C
+    }
+    note for GeneticAlgorithm "D01 solve\nD02 createIndividual\nD03 initializePopulation\nD04 reproduce\nD05 findBest"
+    note for SchedulingGA "D06 createIndividual"
+    note for RecommendationGA "D07 createIndividual"
+    note for GeneticProblem "D08 evaluate\nD09 crossover\nD10 mutate"
+    note for Selection "D11 select"
+    note for TournamentSelection "D12 select"
+    note for Fitness "D13 compareTo"
+    note for SchedulingProblem "D14 createIndividual\nD15 evaluate\nD16 crossover\nD17 mutate\nD18 decode"
+    note for RecommendationProblem "D19 createIndividual\nD20 evaluate\nD21 crossover\nD22 mutate"
+    GeneticAlgorithm <|-- SchedulingGA
+    GeneticAlgorithm <|-- RecommendationGA
+    GeneticAlgorithm --> GeneticProblem : uses
+    GeneticAlgorithm --> Selection : uses
+    GeneticAlgorithm --> GAConfig : configured by
+    GeneticAlgorithm ..> Population : manages
+    Selection <|.. TournamentSelection
+    GeneticProblem <|.. SchedulingProblem
+    GeneticProblem <|.. RecommendationProblem
+    SchedulingGA --> SchedulingProblem : delegates creation
+    RecommendationGA --> RecommendationProblem : delegates creation
+    Selection ..> GeneticProblem : evaluates
+    GeneticProblem ..> Fitness : returns
+    Population *-- Individual : contains
+    Individual *-- Chromosome : owns
+    SchedulingProblem --> ProductionDemand : requires
+    ProductionDemand --> ProductionProduct : specifies
+    SchedulingProblem --> Machine : uses
+    SchedulingProblem --> Worker : uses
+    SchedulingProblem ..> Schedule : decodes
+    Schedule *-- ProductionTask : contains
+    ProductionTask --> ProductionProduct : produces
+    ProductionTask --> Machine : assigned
+    ProductionTask --> Worker : assigned
+    RecommendationProblem --> Product : candidates
+    Product --> Category : classified

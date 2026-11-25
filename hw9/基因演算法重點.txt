@@ -1,0 +1,20 @@
+基因演算法 GeneticAlgorithm
+    篩選 Selection
+        錦標賽篩選法 Tournament Selection
+        排序篩選法 Rank Selection
+    交配 crossover
+        一點交配 Single-Point Crossover
+        雙點交配 Two-Point Crossover 
+        均勻交配 Uniform Crossover
+    變異 Mutation
+        隨機替換 Random Replacement
+        反轉操作 Inversion Mutation
+基因 Genes
+染色體 Chromosome 一序列的基因 (Genes)
+個體 Individual 
+    交配 Crossover
+    適應度 Fitness
+種群 Population 
+最佳化問題 OptimizationProblem
+    工廠生產排程
+    購物網站推薦

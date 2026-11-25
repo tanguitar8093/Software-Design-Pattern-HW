@@ -1,0 +1,106 @@
+classDiagram
+    direction TB
+    class GeneticAlgorithm {
+        +solve(problem, populationSize, maxIterations) Individual
+        +initializePopulation(problem, populationSize) Population
+        +select(problem, population) List~Individual~
+        +crossover(problem, parents, populationSize) Population
+        +mutate(problem, population) Population
+        +findBest(problem, population) Individual
+    }
+    class OptimizationProblem {
+        <<interface>>
+        +createIndividual() Individual
+        +evaluate(individual) Fitness
+        +crossover(parent1, parent2) Individual
+        +mutate(individual) Individual
+    }
+    class Population {
+        individuals : List~Individual~
+    }
+    class Individual {
+        chromosome : Chromosome
+    }
+    class Chromosome {
+        genes : List~Gene~
+    }
+    class Gene {
+        value : Object
+    }
+    class Fitness {
+        feasible : Boolean
+        score : Number
+    }
+    class SchedulingProblem {
+        demands : List~ProductionDemand~
+        machines : List~Machine~
+        workers : List~Worker~
+        +createIndividual() Individual
+        +evaluate(individual) Fitness
+        +crossover(parent1, parent2) Individual
+        +mutate(individual) Individual
+    }
+    class ProductionDemand {
+        product : ManufacturedProduct
+        quantity : Integer
+    }
+    class ManufacturedProduct {
+        productionHours : Number
+    }
+    class ProductionTask {
+        product : ManufacturedProduct
+        machine : Machine
+        worker : Worker
+        startTime : Number
+        endTime : Number
+    }
+    class Machine
+    class Worker
+    class RecommendationProblem {
+        products : List~Product~
+        budget : Number
+        capacity : Number
+        preferences : List~CategoryPreference~
+        +createIndividual() Individual
+        +evaluate(individual) Fitness
+        +crossover(parent1, parent2) Individual
+        +mutate(individual) Individual
+    }
+    class Product {
+        price : Number
+        weight : Number
+        category : ProductCategory
+    }
+    class ProductCategory
+    class CategoryPreference {
+        category : ProductCategory
+        preference : Number
+    }
+
+    note for GeneticAlgorithm "FN-01 solve\nFN-02 initializePopulation\nFN-03 select\nFN-04 crossover\nFN-05 mutate\nFN-06 findBest"
+    note for OptimizationProblem "FN-07 createIndividual\nFN-08 evaluate\nFN-09 crossover\nFN-10 mutate"
+    note for SchedulingProblem "FN-11 createIndividual\nFN-12 evaluate\nFN-13 crossover\nFN-14 mutate"
+    note for RecommendationProblem "FN-15 createIndividual\nFN-16 evaluate\nFN-17 crossover\nFN-18 mutate"
+
+    GeneticAlgorithm --> OptimizationProblem : invokes
+    GeneticAlgorithm --> Population : reads and produces
+    OptimizationProblem ..> Individual : creates and evaluates
+    OptimizationProblem ..> Fitness : returns
+    OptimizationProblem <|.. SchedulingProblem
+    OptimizationProblem <|.. RecommendationProblem
+    Population "1" *-- "1..*" Individual : contains
+    Individual "1" *-- "1" Chromosome : has
+    Chromosome "1" *-- "0..*" Gene : contains
+    SchedulingProblem "1" --> "1..*" ProductionDemand : requires
+    SchedulingProblem "1" --> "1..*" Machine : available
+    SchedulingProblem "1" --> "1..*" Worker : available
+    ProductionDemand "*" --> "1" ManufacturedProduct : specifies
+    ProductionTask "*" --> "1" ManufacturedProduct : produces
+    ProductionTask "*" --> "1" Machine : uses
+    ProductionTask "*" --> "1" Worker : assigned
+    RecommendationProblem "1" --> "1..*" Product : candidates
+    RecommendationProblem "1" --> "1..*" CategoryPreference : considers
+    Product "*" --> "1" ProductCategory : belongs to
+    CategoryPreference "*" --> "1" ProductCategory : describes
+    Gene ..> ProductionTask : scheduling value
+    Gene ..> Product : recommendation value

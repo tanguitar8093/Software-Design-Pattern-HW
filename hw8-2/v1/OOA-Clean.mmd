@@ -133,7 +133,173 @@ Astah
     Post "1" *-- "0..*" Comment
     Broadcast "1" *-- "0..*" VoiceMessage
 
-    %% 機器人對社群組件與活動的掌握
+    %% 機器人對社群組件與活動的掌握classDiagram
+    class OptimizationProblem {
+        objective
+        constraints
+    }
+    class GeneticAlgorithm {
+        initializePopulation()
+        evolve()
+        findBestIndividual()
+    }
+    class Population {
+        generation
+    }
+    class Individual {
+        fitness
+    }
+    class Chromosome
+    class Gene
+    class Evolution {
+        select()
+        crossover()
+        mutate()
+    }
+    class ProductionSchedulingProblem {
+        minimizeCompletionTime
+        minimizeProductionCost
+    }
+    class ProductionSchedule
+    class ProductionTask {
+        startTime
+        endTime
+    }
+    class ProductionDemand {
+        quantity
+    }
+    class ManufacturedProduct {
+        productionTime
+    }
+    class Machine
+    class Worker
+    class ProductRecommendationProblem {
+        budgetLimit
+        weightLimit
+        maximizePreference
+    }
+    class RecommendationList
+    class RecommendationItem {
+        quantity
+    }
+    class Product {
+        price
+        weight
+    }
+    class ProductCategory
+    class CategoryPreference {
+        preference
+    }
+
+    OptimizationProblem "1" --> "1" GeneticAlgorithm : uses
+    GeneticAlgorithm "1" --> "1" Population : maintains current
+    GeneticAlgorithm "1" --> "*" Evolution : performs
+    Population "1" *-- "1..*" Individual : contains
+    Individual "1" *-- "1" Chromosome : represented by
+    Chromosome "1" *-- "1..*" Gene : consists of
+    Evolution --> Population : produces next generation
+
+    OptimizationProblem <|-- ProductionSchedulingProblem
+    OptimizationProblem <|-- ProductRecommendationProblem
+    Individual <|-- ProductionSchedule
+    Individual <|-- RecommendationList
+
+    ProductionSchedulingProblem "1" --> "1..*" ProductionDemand : includes
+    ProductionDemand "*" --> "1" ManufacturedProduct : specifies
+    ProductionSchedule "1" *-- "1..*" ProductionTask : contains
+    ProductionTask "*" --> "1" ManufacturedProduct : produces
+    ProductionTask "*" --> "1" Machine : uses
+    ProductionTask "*" --> "1" Worker : assigned to
+classDiagram
+    class OptimizationProblem {
+        objective
+        constraints
+    }
+    class GeneticAlgorithm {
+        initializePopulation()
+        evolve()
+        findBestIndividual()
+    }
+    class Population {
+        generation
+    }
+    class Individual {
+        fitness
+    }
+    class Chromosome
+    class Gene
+    class Evolution {
+        select()
+        crossover()
+        mutate()
+    }
+    class ProductionSchedulingProblem {
+        minimizeCompletionTime
+        minimizeProductionCost
+    }
+    class ProductionSchedule
+    class ProductionTask {
+        startTime
+        endTime
+    }
+    class ProductionDemand {
+        quantity
+    }
+    class ManufacturedProduct {
+        productionTime
+    }
+    class Machine
+    class Worker
+    class ProductRecommendationProblem {
+        budgetLimit
+        weightLimit
+        maximizePreference
+    }
+    class RecommendationList
+    class RecommendationItem {
+        quantity
+    }
+    class Product {
+        price
+        weight
+    }
+    class ProductCategory
+    class CategoryPreference {
+        preference
+    }
+
+    OptimizationProblem "1" --> "1" GeneticAlgorithm : uses
+    GeneticAlgorithm "1" --> "1" Population : maintains current
+    GeneticAlgorithm "1" --> "*" Evolution : performs
+    Population "1" *-- "1..*" Individual : contains
+    Individual "1" *-- "1" Chromosome : represented by
+    Chromosome "1" *-- "1..*" Gene : consists of
+    Evolution --> Population : produces next generation
+
+    OptimizationProblem <|-- ProductionSchedulingProblem
+    OptimizationProblem <|-- ProductRecommendationProblem
+    Individual <|-- ProductionSchedule
+    Individual <|-- RecommendationList
+
+    ProductionSchedulingProblem "1" --> "1..*" ProductionDemand : includes
+    ProductionDemand "*" --> "1" ManufacturedProduct : specifies
+    ProductionSchedule "1" *-- "1..*" ProductionTask : contains
+    ProductionTask "*" --> "1" ManufacturedProduct : produces
+    ProductionTask "*" --> "1" Machine : uses
+    ProductionTask "*" --> "1" Worker : assigned to
+
+    ProductRecommendationProblem "1" --> "1..*" CategoryPreference : considers
+    RecommendationList "1" *-- "0..*" RecommendationItem : contains
+    RecommendationItem "*" --> "1" Product : specifies
+    Product "*" --> "1" ProductCategory : belongs to
+    CategoryPreference "*" --> "1" ProductCategory : applies to
+
+    ProductRecommendationProblem "1" --> "1..*" CategoryPreference : considers
+    RecommendationList "1" *-- "0..*" RecommendationItem : contains
+    RecommendationItem "*" --> "1" Product : specifies
+    Product "*" --> "1" ProductCategory : belongs to
+    CategoryPreference "*" --> "1" ProductCategory : applies to
+
     Bot --> ChatRoom : 監聽並回覆訊息
     Bot --> Forum : 監聽並發表留言
     Bot --> Broadcast : 監聽語音或廣播發言
